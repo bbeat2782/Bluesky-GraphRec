@@ -10,7 +10,7 @@ import json
 import torch
 import torch.nn as nn
 
-from models.DyGFormer import DyGFormer
+from models.GraphRec import GraphRec
 from models.modules import MergeLayer
 from utils.utils import set_random_seed, convert_to_gpu, get_parameter_sizes, create_optimizer
 from utils.utils import get_neighbor_sampler, NegativeEdgeSampler
@@ -89,8 +89,8 @@ if __name__ == "__main__":
         logger.info(f'configuration is {args}')
 
         # create model
-        if args.model_name == 'DyGFormer':
-            dynamic_backbone = DyGFormer(node_raw_features=node_raw_features, edge_raw_features=edge_raw_features, neighbor_sampler=train_neighbor_sampler,
+        if args.model_name == 'GraphRec':
+            dynamic_backbone = GraphRec(node_raw_features=node_raw_features, edge_raw_features=edge_raw_features, neighbor_sampler=train_neighbor_sampler,
                                          time_feat_dim=args.time_feat_dim, channel_embedding_dim=args.channel_embedding_dim, patch_size=args.patch_size,
                                          num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout,
                                          max_input_sequence_length=args.max_input_sequence_length, device=args.device)
@@ -119,7 +119,7 @@ if __name__ == "__main__":
         for epoch in range(args.num_epochs):
 
             model.train()
-            if args.model_name in ['DyGFormer']:
+            if args.model_name in ['GraphRec']:
                 # training, only use training graph
                 model[0].set_neighbor_sampler(train_neighbor_sampler)
 
@@ -137,7 +137,7 @@ if __name__ == "__main__":
 
                 # we need to compute for positive and negative edges respectively, because the new sampling strategy (for evaluation) allows the negative source nodes to be
                 # different from the source nodes, this is different from previous works that just replace destination nodes with negative destination nodes
-                if args.model_name in ['DyGFormer']:
+                if args.model_name in ['GraphRec']:
                     # get temporal embedding of source and destination nodes
                     # two Tensors, with shape (batch_size, node_feat_dim)
                     batch_src_node_embeddings, batch_dst_node_embeddings = \

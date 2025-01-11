@@ -8,7 +8,7 @@ import json
 import torch.nn as nn
 
 from models.MemoryModel import MemoryModel, compute_src_dst_node_time_shifts
-from models.DyGFormer import DyGFormer
+from models.GraphRec import GraphRec
 from models.modules import MergeLayer
 from utils.utils import set_random_seed, convert_to_gpu, get_parameter_sizes
 from utils.utils import get_neighbor_sampler, NegativeEdgeSampler
@@ -94,8 +94,8 @@ if __name__ == "__main__":
         logger.info(f'configuration is {args}')
 
         # create model
-        if args.model_name == 'DyGFormer':
-            dynamic_backbone = DyGFormer(node_raw_features=node_raw_features, edge_raw_features=edge_raw_features, neighbor_sampler=full_neighbor_sampler,
+        if args.model_name == 'GraphRec':
+            dynamic_backbone = GraphRec(node_raw_features=node_raw_features, edge_raw_features=edge_raw_features, neighbor_sampler=full_neighbor_sampler,
                                             time_feat_dim=args.time_feat_dim, channel_embedding_dim=args.channel_embedding_dim, patch_size=args.patch_size,
                                             num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout,
                                             max_input_sequence_length=args.max_input_sequence_length, device=args.device)
