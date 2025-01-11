@@ -1,0 +1,22 @@
+# DuckDB files
+*.duckdb
+*.duckdb.wal
+
+# Generated JSON files
+app_bsky_*.json
+
+# Python/Jupyter
+__pycache__/
+.ipynb_checkpoints/
+*.pyc
+
+# Environment
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE settings
+.vscode/
+.idea/
