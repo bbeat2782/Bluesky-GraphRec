@@ -14,8 +14,8 @@ def get_link_prediction_args(is_evaluation: bool = False):
     parser.add_argument('--dataset_name', type=str, help='dataset to be used', default='bluesky',
                         choices=['bluesky', 'wikipedia'])
     parser.add_argument('--batch_size', type=int, default=200, help='batch size')
-    parser.add_argument('--model_name', type=str, default='DyGFormer', help='name of the model, note that EdgeBank is only applicable for evaluation',
-                        choices=['DyGFormer'])
+    parser.add_argument('--model_name', type=str, default='GraphRec', help='name of the model, note that EdgeBank is only applicable for evaluation',
+                        choices=['GraphRec'])
     parser.add_argument('--gpu', type=int, default=0, help='number of gpu to use')
     parser.add_argument('--num_neighbors', type=int, default=20, help='number of neighbors to sample for each node')
     parser.add_argument('--sample_neighbor_strategy', type=str, default='recent', choices=['uniform', 'recent', 'time_interval_aware'], help='how to sample historical neighbors')
@@ -70,7 +70,7 @@ def load_link_prediction_best_configs(args: argparse.Namespace):
     :return:
     """
     # model specific settings
-    if args.model_name == 'DyGFormer':
+    if args.model_name == 'GraphRec':
         args.num_layers = 2
         if args.dataset_name in ['reddit']:
             args.max_input_sequence_length = 64

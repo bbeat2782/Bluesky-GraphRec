@@ -9,7 +9,7 @@ import argparse
 import os
 import json
 
-from utils.metrics import get_link_prediction_metrics, get_node_classification_metrics
+from utils.metrics import get_link_prediction_metrics
 from utils.utils import set_random_seed
 from utils.utils import NegativeEdgeSampler, NeighborSampler
 from utils.DataLoader import Data
@@ -35,7 +35,7 @@ def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_s
     assert evaluate_neg_edge_sampler.seed is not None
     evaluate_neg_edge_sampler.reset_random_state()
 
-    if model_name in ['DyGFormer']:
+    if model_name in ['GraphRec']:
         # evaluation phase use all the graph information
         model[0].set_neighbor_sampler(neighbor_sampler)
 
@@ -63,7 +63,7 @@ def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_s
 
             # we need to compute for positive and negative edges respectively, because the new sampling strategy (for evaluation) allows the negative source nodes to be
             # different from the source nodes, this is different from previous works that just replace destination nodes with negative destination nodes
-            if model_name in ['DyGFormer']:
+            if model_name in ['GraphRec']:
                 # get temporal embedding of source and destination nodes
                 # two Tensors, with shape (batch_size, node_feat_dim)
                 batch_src_node_embeddings, batch_dst_node_embeddings = \
