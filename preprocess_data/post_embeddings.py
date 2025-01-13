@@ -4,13 +4,14 @@
 import pandas as pd
 import numpy as np
 from sentence_transformers import SentenceTransformer
-
+from transformers import AutoModel
 # sample.csv should have two columns: `item_id` and `text`
 unique_posts = pd.read_csv('../DG_data/bluesky/sample.csv')
 
-# https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
-# embedding into 384 dimension
-model = SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
+# https://huggingface.co/jinaai/jina-embeddings-v3
+# https://emschwartz.me/binary-vector-embeddings-are-so-cool/
+# embedding into 128 dimension + binary quantization
+model = AutoModel.from_pretrained("jinaai/jina-embeddings-v3", trust_remote_code=True)
 
 # DataLoader for batching
 batch_size = 1024*8
@@ -23,13 +24,14 @@ def batch_generator(data, batch_size):
 # Process posts in batches
 all_embeddings = []
 for batch_texts in batch_generator(unique_posts['text'].tolist(), batch_size):
-    embeddings = model.encode(batch_texts)
-    all_embeddings.extend(embeddings)
+    embeddings = model.encode(batch_texts, truncate_dim=128)
+    binary_embeddings = (embeddings > 0).astype(np.uint8)
+    all_embeddings.extend(binary_embeddings)
 
 # Convert embeddings to strings for CSV storage
 unique_posts = unique_posts.drop(columns=['text'])
 unique_posts['embeddings'] = [
-    ','.join(map(str, emb.astype(np.float16))) for emb in all_embeddings
+    ','.join(map(str, emb)) for emb in all_embeddings
 ]
 
 # Save DataFrame to CSV
