@@ -136,3 +136,6 @@ DG_data/*/*
 !DG_data/myket/*
 processed_data/*/*
 !processed_data/myket/*
+
+# data_map_plot
+data_map_plot/
