@@ -28,7 +28,7 @@ if __name__ == "__main__":
     args = get_link_prediction_args(is_evaluation=False)
 
     # get data for training, validation and testing
-    node_raw_features, edge_raw_features, full_data, train_data, val_data, test_data, new_node_val_data, new_node_test_data = \
+    node_raw_features, edge_raw_features, full_data, train_data, val_data, test_data, new_node_val_data, new_node_test_data, user_dynamic_features = \
         get_link_prediction_data(dataset_name=args.dataset_name, val_ratio=args.val_ratio, test_ratio=args.test_ratio)
 
     # initialize training neighbor sampler to retrieve temporal graph
@@ -90,7 +90,7 @@ if __name__ == "__main__":
 
         # create model
         if args.model_name == 'GraphRec':
-            dynamic_backbone = GraphRec(node_raw_features=node_raw_features, edge_raw_features=edge_raw_features, neighbor_sampler=train_neighbor_sampler,
+            dynamic_backbone = GraphRec(node_raw_features=node_raw_features, edge_raw_features=edge_raw_features, user_dynamic_features=user_dynamic_features, neighbor_sampler=train_neighbor_sampler,
                                          time_feat_dim=args.time_feat_dim, channel_embedding_dim=args.channel_embedding_dim, patch_size=args.patch_size,
                                          num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout,
                                          max_input_sequence_length=args.max_input_sequence_length, device=args.device)
@@ -131,6 +131,8 @@ if __name__ == "__main__":
                 batch_src_node_ids, batch_dst_node_ids, batch_node_interact_times, batch_edge_ids = \
                     train_data.src_node_ids[train_data_indices], train_data.dst_node_ids[train_data_indices], \
                     train_data.node_interact_times[train_data_indices], train_data.edge_ids[train_data_indices]
+                # For dynamic features
+                batch_src_idx = train_data.idx[train_data_indices]
 
                 _, batch_neg_dst_node_ids = train_neg_edge_sampler.sample(size=len(batch_src_node_ids))
                 batch_neg_src_node_ids = batch_src_node_ids
@@ -143,7 +145,8 @@ if __name__ == "__main__":
                     batch_src_node_embeddings, batch_dst_node_embeddings = \
                         model[0].compute_src_dst_node_temporal_embeddings(src_node_ids=batch_src_node_ids,
                                                                           dst_node_ids=batch_dst_node_ids,
-                                                                          node_interact_times=batch_node_interact_times)
+                                                                          node_interact_times=batch_node_interact_times,
+                                                                          batch_src_idx=batch_src_idx)
 
                     # get temporal embedding of negative source and negative destination nodes
                     # two Tensors, with shape (batch_size, node_feat_dim)
