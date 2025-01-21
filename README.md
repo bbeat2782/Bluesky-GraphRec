@@ -16,7 +16,7 @@ We can run ```preprocess_data/preprocess_data.py``` for pre-processing the datas
 For example, to preprocess the *Wikipedia* dataset, we can run the following commands:
 ```{bash}
 cd preprocess_data/
-python preprocess_data.py  --dataset_name wikipedia
+python preprocess_data.py  --dataset_name bluesky
 ```
 We can also run the following commands to preprocess all the original datasets at once:
 ```{bash}
@@ -50,13 +50,13 @@ TODO
 Dynamic link prediction could be performed on all the thirteen datasets. 
 If you want to load the best model configurations determined by the grid search, please set the *load_best_configs* argument to True.
 #### Model Training
-* Example of training *DyGFormer* on *Wikipedia* dataset:
+* Example of training *GraphRec* on *Bluesky* dataset:
 ```{bash}
-python train_link_prediction.py --dataset_name wikipedia --model_name DyGFormer --patch_size 2 --max_input_sequence_length 64 --num_runs 5 --gpu 0
+python train_link_prediction.py --dataset_name bluesky --model_name GraphRec --patch_size 2 --max_input_sequence_length 64 --num_runs 5 --gpu 0
 ```
 * If you want to use the best model configurations to train *DyGFormer* on *Wikipedia* dataset, run
 ```{bash}
-python train_link_prediction.py --dataset_name wikipedia --model_name DyGFormer --load_best_configs --num_runs 5 --gpu 0
+python train_link_prediction.py --dataset_name bluesky --model_name GraphRec --load_best_configs --num_runs 5 --gpu 0
 ```
 #### Model Evaluation
 Three (i.e., random, historical, and inductive) negative sampling strategies can be used for model evaluation.
