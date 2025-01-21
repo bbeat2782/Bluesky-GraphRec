@@ -73,7 +73,7 @@ class NeighborSampler:
     def __init__(self, adj_list: list, sample_neighbor_strategy: str = 'uniform', time_scaling_factor: float = 0.0, seed: int = None):
         """
         Neighbor sampler.
-        :param adj_list: list, list of list, where each element is a list of triple tuple (node_id, edge_id, timestamp)
+        :param adj_list: list, list of list, where each element is a list of quadratic tuple (node_id, edge_id, timestamp, idx)
         :param sample_neighbor_strategy: str, how to sample historical neighbors, 'uniform', 'recent', or 'time_interval_aware'
         :param time_scaling_factor: float, a hyper-parameter that controls the sampling preference with time interval,
         a large time_scaling_factor tends to sample more on recent links, this parameter works when sample_neighbor_strategy == 'time_interval_aware'
@@ -86,6 +86,7 @@ class NeighborSampler:
         self.nodes_neighbor_ids = []
         self.nodes_edge_ids = []
         self.nodes_neighbor_times = []
+        self.nodes_neighbor_idx = []
 
         if self.sample_neighbor_strategy == 'time_interval_aware':
             self.nodes_neighbor_sampled_probabilities = []
@@ -101,6 +102,7 @@ class NeighborSampler:
             self.nodes_neighbor_ids.append(np.array([x[0] for x in sorted_per_node_neighbors]))
             self.nodes_edge_ids.append(np.array([x[1] for x in sorted_per_node_neighbors]))
             self.nodes_neighbor_times.append(np.array([x[2] for x in sorted_per_node_neighbors]))
+            self.nodes_neighbor_idx.append(np.array([x[3] for x in sorted_per_node_neighbors]))
 
             # additional for time interval aware sampling strategy (proposed in CAWN paper)
             if self.sample_neighbor_strategy == 'time_interval_aware':
@@ -144,7 +146,7 @@ class NeighborSampler:
             return self.nodes_neighbor_ids[node_id][:i], self.nodes_edge_ids[node_id][:i], self.nodes_neighbor_times[node_id][:i], \
                    self.nodes_neighbor_sampled_probabilities[node_id][:i]
         else:
-            return self.nodes_neighbor_ids[node_id][:i], self.nodes_edge_ids[node_id][:i], self.nodes_neighbor_times[node_id][:i], None
+            return self.nodes_neighbor_ids[node_id][:i], self.nodes_edge_ids[node_id][:i], self.nodes_neighbor_times[node_id][:i], None, self.nodes_neighbor_idx[node_id][:i]
 
     def get_historical_neighbors(self, node_ids: np.ndarray, node_interact_times: np.ndarray, num_neighbors: int = 20):
         """
@@ -259,18 +261,19 @@ class NeighborSampler:
         :return:
         """
         # three lists to store the first-hop neighbor ids, edge ids and interaction timestamp information, with batch_size as the list length
-        nodes_neighbor_ids_list, nodes_edge_ids_list, nodes_neighbor_times_list = [], [], []
+        nodes_neighbor_ids_list, nodes_edge_ids_list, nodes_neighbor_times_list, node_neighbor_idx_list = [], [], [], []
         # get the temporal neighbors at the first hop
         for idx, (node_id, node_interact_time) in enumerate(zip(node_ids, node_interact_times)):
             # find neighbors that interacted with node_id before time node_interact_time
-            node_neighbor_ids, node_edge_ids, node_neighbor_times, _ = self.find_neighbors_before(node_id=node_id,
+            node_neighbor_ids, node_edge_ids, node_neighbor_times, _, node_neighbor_idx = self.find_neighbors_before(node_id=node_id,
                                                                                                   interact_time=node_interact_time,
                                                                                                   return_sampled_probabilities=False)
             nodes_neighbor_ids_list.append(node_neighbor_ids)
             nodes_edge_ids_list.append(node_edge_ids)
             nodes_neighbor_times_list.append(node_neighbor_times)
+            node_neighbor_idx_list.append(node_neighbor_idx)
 
-        return nodes_neighbor_ids_list, nodes_edge_ids_list, nodes_neighbor_times_list
+        return nodes_neighbor_ids_list, nodes_edge_ids_list, nodes_neighbor_times_list, node_neighbor_idx_list
 
     def reset_random_state(self):
         """
@@ -295,9 +298,9 @@ def get_neighbor_sampler(data: Data, sample_neighbor_strategy: str = 'uniform', 
     # adj_list, list of list, where each element is a list of triple tuple (node_id, edge_id, timestamp)
     # the list at the first position in adj_list is empty
     adj_list = [[] for _ in range(max_node_id + 1)]
-    for src_node_id, dst_node_id, edge_id, node_interact_time in zip(data.src_node_ids, data.dst_node_ids, data.edge_ids, data.node_interact_times):
-        adj_list[src_node_id].append((dst_node_id, edge_id, node_interact_time))
-        adj_list[dst_node_id].append((src_node_id, edge_id, node_interact_time))
+    for src_node_id, dst_node_id, edge_id, node_interact_time, idx in zip(data.src_node_ids, data.dst_node_ids, data.edge_ids, data.node_interact_times, data.idx):
+        adj_list[src_node_id].append((dst_node_id, edge_id, node_interact_time, idx))
+        adj_list[dst_node_id].append((src_node_id, edge_id, node_interact_time, idx))
 
     return NeighborSampler(adj_list=adj_list, sample_neighbor_strategy=sample_neighbor_strategy, time_scaling_factor=time_scaling_factor, seed=seed)
 

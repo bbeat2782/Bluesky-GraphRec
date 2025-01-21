@@ -6,16 +6,18 @@ from torch.nn import MultiheadAttention
 from models.modules import TimeEncoder
 from utils.utils import NeighborSampler
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+import time
 
 class GraphRec(nn.Module):
 
-    def __init__(self, node_raw_features: np.ndarray, edge_raw_features: np.ndarray, neighbor_sampler: NeighborSampler,
+    def __init__(self, node_raw_features: np.ndarray, edge_raw_features: np.ndarray, user_dynamic_features, neighbor_sampler: NeighborSampler,
                  time_feat_dim: int, channel_embedding_dim: int, patch_size: int = 1, num_layers: int = 2, num_heads: int = 2,
-                 dropout: float = 0.1, max_input_sequence_length: int = 512, device: str = 'cpu'):
+                 dropout: float = 0.1, max_input_sequence_length: int = 512, device: str = 'cpu', max_user_feature_dim=2):
         """
         GraphRec model.
         :param node_raw_features: ndarray, shape (num_nodes + 1, node_feat_dim)
         :param edge_raw_features: ndarray, shape (num_edges + 1, edge_feat_dim)
+        :param user_dynamic_features: ndarray, shape (num interactions + 1, max_user_feature_dim) for now
         :param neighbor_sampler: neighbor sampler
         :param time_feat_dim: int, dimension of time features (encodings)
         :param channel_embedding_dim: int, dimension of each channel embedding
@@ -29,11 +31,11 @@ class GraphRec(nn.Module):
         super(GraphRec, self).__init__()
 
         self.node_raw_features = torch.from_numpy(node_raw_features.astype(np.float32)).to(device)
-        #self.edge_raw_features = torch.from_numpy(edge_raw_features.astype(np.float32)).to(device)
+        self.user_dynamic_features = torch.from_numpy(user_dynamic_features.astype(np.float32)).to(device)
+        self.device = device
 
         self.neighbor_sampler = neighbor_sampler
         self.node_feat_dim = self.node_raw_features.shape[1]
-        #self.edge_feat_dim = self.edge_raw_features.shape[1]
         self.time_feat_dim = time_feat_dim
         self.channel_embedding_dim = channel_embedding_dim
         self.patch_size = patch_size
@@ -41,7 +43,6 @@ class GraphRec(nn.Module):
         self.num_heads = num_heads
         self.dropout = dropout
         self.max_input_sequence_length = max_input_sequence_length
-        self.device = device
         
         self.time_encoder = TimeEncoder(time_dim=time_feat_dim)
 
@@ -59,21 +60,21 @@ class GraphRec(nn.Module):
 
         self.output_layer = nn.Linear(in_features=self.num_channels * self.channel_embedding_dim, out_features=self.node_feat_dim, bias=True)
 
-    def compute_src_dst_node_temporal_embeddings(self, src_node_ids: np.ndarray, dst_node_ids: np.ndarray, node_interact_times: np.ndarray):
+    def compute_src_dst_node_temporal_embeddings(self, src_node_ids: np.ndarray, dst_node_ids: np.ndarray, node_interact_times: np.ndarray, batch_src_idx=None):
         """
         compute source and destination node temporal embeddings
         :param src_node_ids: ndarray, shape (batch_size, )
         :param dst_node_ids: ndarray, shape (batch_size, )
         :param node_interact_times: ndarray, shape (batch_size, )
+        :param batch_src_idx: TODO for src nodes only (for ndynamic features)
         :return:
         """
-        # get the second-hop neighbors of source and destination nodes
+        # get the first-hop neighbors of source and destination nodes
         # three lists to store source nodes' first-hop neighbor ids, edge ids and interaction timestamp information, with batch_size as the list length
-        src_nodes_neighbor_ids_list, src_nodes_edge_ids_list, src_nodes_neighbor_times_list = \
+        src_nodes_neighbor_ids_list, src_nodes_edge_ids_list, src_nodes_neighbor_times_list, src_nodes_neighbor_idx_list = \
             self.neighbor_sampler.get_all_first_hop_neighbors(node_ids=src_node_ids, node_interact_times=node_interact_times)
-
         # three lists to store destination nodes' first-hop neighbor ids, edge ids and interaction timestamp information, with batch_size as the list length
-        dst_nodes_neighbor_ids_list, dst_nodes_edge_ids_list, dst_nodes_neighbor_times_list = \
+        dst_nodes_neighbor_ids_list, dst_nodes_edge_ids_list, dst_nodes_neighbor_times_list, dst_nodes_neighbor_idx_list = \
             self.neighbor_sampler.get_all_first_hop_neighbors(node_ids=dst_node_ids, node_interact_times=node_interact_times)
 
         # pad the sequences of first-hop neighbors for source and destination nodes
@@ -99,7 +100,7 @@ class GraphRec(nn.Module):
         # src_padded_nodes_neighbor_time_features, Tensor, shape (batch_size, src_max_seq_length, time_feat_dim)
         src_padded_nodes_neighbor_node_raw_features, src_padded_nodes_neighbor_time_features = \
             self.get_features(node_interact_times=node_interact_times, padded_nodes_neighbor_ids=src_padded_nodes_neighbor_ids,
-                              padded_nodes_edge_ids=src_padded_nodes_edge_ids, padded_nodes_neighbor_times=src_padded_nodes_neighbor_times, time_encoder=self.time_encoder)
+                              padded_nodes_edge_ids=src_padded_nodes_edge_ids, padded_nodes_neighbor_times=src_padded_nodes_neighbor_times, time_encoder=self.time_encoder, is_user=True)
 
         # dst_padded_nodes_neighbor_node_raw_features, Tensor, shape (batch_size, dst_max_seq_length, node_feat_dim)
         # dst_padded_nodes_edge_raw_features, Tensor, shape (batch_size, dst_max_seq_length, edge_feat_dim)
@@ -220,7 +221,7 @@ class GraphRec(nn.Module):
         return padded_nodes_neighbor_ids, padded_nodes_edge_ids, padded_nodes_neighbor_times
 
     def get_features(self, node_interact_times: np.ndarray, padded_nodes_neighbor_ids: np.ndarray, padded_nodes_edge_ids: np.ndarray,
-                     padded_nodes_neighbor_times: np.ndarray, time_encoder: TimeEncoder):
+                     padded_nodes_neighbor_times: np.ndarray, time_encoder: TimeEncoder, is_user=False):
         """
         get node, edge and time features
         :param node_interact_times: ndarray, shape (batch_size, )
@@ -231,7 +232,15 @@ class GraphRec(nn.Module):
         :return:
         """
         # Tensor, shape (batch_size, max_seq_length, node_feat_dim)
+        # TODO need a way to get `padded_nodes_neighbor_node_raw_features` using the dynamic user node features --> store it with the model? how to determine when to access that?
+        # print('padded_nodes_neighbor_ids:', padded_nodes_neighbor_ids.shape)
+        # print(padded_nodes_neighbor_ids)
+        # print('padded_nodes_neighbor_times:', padded_nodes_neighbor_times.shape)
+        # raise ValueError()
+        # Move raw features to CPU to avoid in-place modification on GPU
+
         padded_nodes_neighbor_node_raw_features = self.node_raw_features[torch.from_numpy(padded_nodes_neighbor_ids)]
+
         # Tensor, shape (batch_size, max_seq_length, edge_feat_dim)
         #padded_nodes_edge_raw_features = self.edge_raw_features[torch.from_numpy(padded_nodes_edge_ids)]
         # Tensor, shape (batch_size, max_seq_length, time_feat_dim)
