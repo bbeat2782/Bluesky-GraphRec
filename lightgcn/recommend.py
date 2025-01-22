@@ -10,13 +10,22 @@ def get_recommendations(model: torch.nn.Module,
                        device: str = 'cuda' if torch.cuda.is_available() else 'cpu') -> List[Tuple[str, str]]:
     """Get recommendations for a user with both AT protocol URIs and web URLs."""
     model = model.to(device)
-    adj_matrix = adj_matrix.to(device)
-    
     model.eval()
+    
     with torch.no_grad():
-        user_embeddings, item_embeddings = model(adj_matrix)
-        
         user_idx = user_mapping[user_id]
+        
+        # Handle different model types
+        if hasattr(model, 'get_embeddings'):
+            # UltraGCN case
+            user_embeddings, item_embeddings = model.get_embeddings()
+            user_embeddings = user_embeddings.to(device)
+            item_embeddings = item_embeddings.to(device)
+        else:
+            # LightGCN case
+            adj_matrix = adj_matrix.to(device)
+            user_embeddings, item_embeddings = model(adj_matrix)
+        
         user_emb = user_embeddings[user_idx]
         scores = torch.matmul(user_emb, item_embeddings.t())
         top_scores, top_indices = torch.topk(scores, k=top_k)

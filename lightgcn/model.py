@@ -60,3 +60,53 @@ class LightGCN(nn.Module):
         users_emb_final, items_emb_final = torch.split(embs, [self.num_users, self.num_items])
         
         return users_emb_final, items_emb_final
+
+class UltraGCN(nn.Module):
+    def __init__(self, num_users: int, num_items: int, embedding_dim: int = 64):
+        """
+        Initialize UltraGCN model.
+        
+        Args:
+            num_users: Number of users in the dataset
+            num_items: Number of items in the dataset
+            embedding_dim: Dimension of embeddings
+        """
+        super().__init__()
+        self.num_users = num_users
+        self.num_items = num_items
+        self.embedding_dim = embedding_dim
+        
+        # Initialize embeddings
+        self.user_embedding = nn.Embedding(num_users, embedding_dim)
+        self.item_embedding = nn.Embedding(num_items, embedding_dim)
+        
+        # Initialize with normal distribution
+        nn.init.normal_(self.user_embedding.weight, std=0.1)
+        nn.init.normal_(self.item_embedding.weight, std=0.1)
+
+    def forward(self, users: torch.Tensor, items: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the model.
+        
+        Args:
+            users: User indices
+            items: Item indices
+            
+        Returns:
+            Predicted ratings
+        """
+        user_emb = self.user_embedding(users)
+        item_emb = self.item_embedding(items)
+        
+        # Simple dot product
+        ratings = torch.sum(user_emb * item_emb, dim=1)
+        return ratings
+
+    def get_embeddings(self) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Get user and item embeddings.
+        
+        Returns:
+            Tuple of user and item embeddings
+        """
+        return self.user_embedding.weight, self.item_embedding.weight
