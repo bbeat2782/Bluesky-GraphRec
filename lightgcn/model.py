@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from typing import Tuple
 
 class LightGCN(nn.Module):
-    def __init__(self, num_users: int, num_items: int, embedding_dim: int = 64, num_layers: int = 3):
+    def __init__(self, num_users: int, num_items: int, embedding_dim: int = 64, num_layers: int = 1):
         """
         Initialize LightGCN model.
         

@@ -22,18 +22,21 @@ def build_user_post_graph(likes_df: pd.DataFrame):
     print(f"Number of unique users: {num_users}, number of unique posts: {num_posts}")
     
     # 2.3 Create edges
-    # Each 'like' is an edge user -> post. For LightGCN (undirected), we add user->post and post->user
+    # turns the actual uris into numerical ids using user2id and post2id
     user_ids = likes_df['user_uri'].apply(lambda x: user2id[x]).values
     post_ids = likes_df['post_uri'].apply(lambda x: post2id[x]).values
 
     # Combine them into edges: two rows = [source_nodes, target_nodes]
+    # Visualization (top row = user_ids, bottom row = post_ids):
+    # tensor([[     0,      1,      1,  ..., 846523, 846524, 846525],
+    #    [ 30470,  30471,  30472,  ...,  13554,  19451,  25516]])
     edge_index = np.vstack((user_ids, post_ids))
     
     # 2.4 Convert to PyTorch tensors
     edge_index = torch.from_numpy(edge_index).long()
     
     # 2.5 Make it undirected for LightGCN
-    #   user->post is row 0, post->user is row 1
+    #   user->post is row 0, post->user is row 1, has the effect of doubling the number of edges
     #   Then coalesce them (remove duplicates, sort, etc.)
     edge_index = to_undirected(edge_index)
     edge_index, _ = coalesce(edge_index, None, num_users + num_posts, num_users + num_posts)
@@ -43,6 +46,10 @@ def build_user_post_graph(likes_df: pd.DataFrame):
         edge_index=edge_index,
         num_nodes=(num_users + num_posts)
     )
+    
+    # Add these attributes needed for training
+    data.num_users = num_users
+    data.num_items = num_posts  # Also adding this for consistency
     
     # We'll store user/post ID maps in data for possible future use:
     data.user2id = user2id

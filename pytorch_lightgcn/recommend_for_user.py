@@ -16,10 +16,11 @@ def recommend_for_user(model, user_idx, data, top_k=5):
     
     # Get recommendations using built-in method
     with torch.no_grad():
-        src_index = torch.tensor([user_idx]).to(device)
+        src_index = torch.tensor([user_idx]).to(device)         
         start_idx = len(data.user2id)
         dst_index = torch.arange(start_idx, data.num_nodes).to(device)
         
+        # Gets the top_k recommendations for the user from 
         recommendations = model.recommend(
             edge_index=data.edge_index.to(device),
             src_index=src_index,
@@ -68,8 +69,7 @@ def recommend_for_user(model, user_idx, data, top_k=5):
         
         # Get user's recent likes
         recent_likes = []
-        # TODO: You'll need to modify this part based on how you store likes in your data structure
-        # This is just a placeholder - you'll need to implement the logic to get recent likes
+        # TODO
         
         con.close()
         
