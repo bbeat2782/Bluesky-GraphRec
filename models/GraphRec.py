@@ -31,7 +31,7 @@ class GraphRec(nn.Module):
         super(GraphRec, self).__init__()
 
         self.node_raw_features = torch.from_numpy(node_raw_features.astype(np.float32)).to(device)
-        self.user_dynamic_features = torch.from_numpy(user_dynamic_features.astype(np.float32)).to(device)
+        #self.user_dynamic_features = torch.from_numpy(user_dynamic_features.astype(np.float32)).to(device)
         self.device = device
 
         self.neighbor_sampler = neighbor_sampler
