@@ -7,7 +7,7 @@ import numpy as np
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def train_lightgcn(data, embedding_dim=64, num_layers=2, epochs=5, batch_size=1024):
+def train_lightgcn(data, embedding_dim=64, num_layers=1, epochs=1, batch_size=32768):
     """
     Train a LightGCN model on the bipartite graph using BPR loss.
     """
