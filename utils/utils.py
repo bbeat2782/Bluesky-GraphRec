@@ -2,6 +2,7 @@ import random
 import torch
 import torch.nn as nn
 import numpy as np
+from datetime import datetime, timedelta
 
 from utils.DataLoader import Data
 
@@ -305,6 +306,82 @@ def get_neighbor_sampler(data: Data, sample_neighbor_strategy: str = 'uniform', 
     return NeighborSampler(adj_list=adj_list, sample_neighbor_strategy=sample_neighbor_strategy, time_scaling_factor=time_scaling_factor, seed=seed)
 
 
+class CandidateEdgeSampler(object):
+    # TODO need to check if likes are actually from within 3 days
+    def __init__(self, src_node_ids, dst_node_ids, interact_times):
+        self.src_node_ids = src_node_ids
+        self.dst_node_ids = dst_node_ids
+        self.interact_times = interact_times
+        self.candidates_cache = {}
+
+    def sample(self, size: int, batch_src_node_ids: np.ndarray, batch_dst_node_ids: np.ndarray,
+               current_batch_start_time: np.ndarray, current_batch_end_time: float = 0.0):
+        """
+        sample negative edges, support random, historical and inductive sampling strategy
+        :param size: int, number of sampled negative edges
+        :param batch_src_node_ids: ndarray, shape (batch_size, ), source node ids in the current batch
+        :param batch_dst_node_ids: ndarray, shape (batch_size, ), destination node ids in the current batch
+        :param current_batch_start_time: float, start time in the current batch
+        :param current_batch_end_time: float, end time in the current batch
+        :return:
+        """
+        # Process each unique start time
+        #unique_times = np.unique(self.interact_times)
+        #print('unique_times:', len(unique_times))
+        candidates_dict = {}
+        unique_start_times = np.unique(current_batch_start_time)
+        for start_time in unique_start_times:
+            # Convert start_time to datetime
+            observed_datetime = datetime.strptime(str(int(start_time)), "%Y%m%d%H%M%S")
+
+            # Subtract 2 days
+            two_days_before = observed_datetime - timedelta(days=2)
+
+            # Convert back to float
+            two_days_before_float = float(two_days_before.strftime("%Y%m%d%H%M%S"))
+
+            # Fetch unique posts for the time range
+            candidates_dict[start_time] = self.get_unique_posts_between_start_end_time(
+                start_time=two_days_before_float, 
+                end_time=start_time
+            )
+
+        return candidates_dict        
+
+    def get_unique_posts_between_start_end_time(self, start_time: float, end_time: float):
+        """
+        get unique edges happened between start and end time
+        :param start_time: float, start timestamp
+        :param end_time: float, end timestamp
+        :return: a set of edges, where each edge is a tuple of (src_node_id, dst_node_id)
+        """
+        selected_time_interval = np.logical_and(self.interact_times >= start_time, self.interact_times <= end_time)
+        candidates = set(self.dst_node_ids[selected_time_interval])
+        return candidates
+
+    def sample_all_interactions(self, size=10):
+        """
+        Use the sample function to go over all interactions in the dataset.
+        :param size: int, number of sampled negative edges
+        :return: dict, mapping all start times in the dataset to their respective sampled interactions
+        """
+        all_interactions = {}
+        unique_times = np.unique(self.interact_times)
+        print('unique_times:', len(unique_times))
+
+        for start_time in unique_times:
+            # Prepare batch data
+            batch_src_node_ids = self.src_node_ids
+            batch_dst_node_ids = self.dst_node_ids
+            current_batch_start_time = np.array([start_time])
+            
+            # Sample using the `sample` method
+            sampled_candidates = self.sample(size, batch_src_node_ids, batch_dst_node_ids, current_batch_start_time)
+            all_interactions[start_time] = sampled_candidates
+
+        return all_interactions
+    
+
 class NegativeEdgeSampler(object):
 
     def __init__(self, src_node_ids: np.ndarray, dst_node_ids: np.ndarray, interact_times: np.ndarray = None, last_observed_time: float = None,
@@ -329,13 +406,34 @@ class NegativeEdgeSampler(object):
         self.earliest_time = min(self.unique_interact_times)
         self.last_observed_time = last_observed_time
 
-        if self.negative_sample_strategy != 'random':
-            # all the possible edges that connect source nodes in self.unique_src_node_ids with destination nodes in self.unique_dst_node_ids
-            self.possible_edges = set((src_node_id, dst_node_id) for src_node_id in self.unique_src_node_ids for dst_node_id in self.unique_dst_node_ids)
+        # if self.negative_sample_strategy != 'random':
+        #     # all the possible edges that connect source nodes in self.unique_src_node_ids with destination nodes in self.unique_dst_node_ids
+        #     self.possible_edges = set((src_node_id, dst_node_id) for src_node_id in self.unique_src_node_ids for dst_node_id in self.unique_dst_node_ids)
 
         if self.negative_sample_strategy == 'inductive':
             # set of observed edges
             self.observed_edges = self.get_unique_edges_between_start_end_time(self.earliest_time, self.last_observed_time)
+
+        if self.negative_sample_strategy == 'real':
+            # Convert the string to a datetime object
+            observed_datetime = datetime.strptime(self.last_observed_time, "%Y%m%d%H%M%S.%f")
+            
+            # Subtract 3 days
+            three_days_before = observed_datetime - timedelta(days=3)
+
+            print('earliest_time', self.earliest_time)
+            print('three_days_before', three_days_before)
+            print('last_observed_time', self.last_observed_time)
+
+            raise ValueError()
+            
+
+            self.observed_edges = self.get_unique_edges_between_start_end_time(three_days_before, self.last_observed_time)
+
+            print('three_days_before', three_days_before)
+            print('last_observed_time', self.last_observed_time)
+            print('size of candidates', len(self.observed_edges))
+            raise ValueError()
 
         if self.seed is not None:
             self.random_state = np.random.RandomState(self.seed)

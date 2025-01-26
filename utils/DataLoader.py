@@ -88,7 +88,7 @@ def get_link_prediction_data(dataset_name: str, val_ratio: float, test_ratio: fl
     #dynamic_feature_file_path = './processed_data/{}/ml_{}_user_dynamic.pkl'.format(dataset_name, dataset_name)
     # with open(dynamic_feature_file_path, 'rb') as f:
     #     user_dynamic_features = pickle.load(f)
-    user_dynamic_features = np.load('./processed_data/{}/ml_{}_user_dynamic.npy'.format(dataset_name, dataset_name))
+    # user_dynamic_features = np.load('./processed_data/{}/ml_{}_user_dynamic.npy'.format(dataset_name, dataset_name))
 
     NODE_FEAT_DIM = EDGE_FEAT_DIM = 128
 
@@ -198,4 +198,4 @@ def get_link_prediction_data(dataset_name: str, val_ratio: float, test_ratio: fl
         new_node_test_data.num_interactions, new_node_test_data.num_unique_nodes))
     print("{} nodes were used for the inductive testing, i.e. are never seen during training".format(len(new_test_node_set)))
 
-    return node_raw_features, edge_raw_features, full_data, train_data, val_data, test_data, new_node_val_data, new_node_test_data, user_dynamic_features
+    return node_raw_features, edge_raw_features, full_data, train_data, val_data, test_data, new_node_val_data, new_node_test_data#, user_dynamic_features
