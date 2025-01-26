@@ -3,7 +3,7 @@ from tqdm import tqdm
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def evaluate_recommendations(model, test_interactions, data, k_values=[20, 100, 1000], batch_size=128):
+def evaluate_recommendations(model, test_interactions, data, k_values=[20, 100, 1000], batch_size=128, min_interactions=5):
     """
     Evaluate the model using Recall@K for multiple K values with batched processing.
     
@@ -13,12 +13,20 @@ def evaluate_recommendations(model, test_interactions, data, k_values=[20, 100, 
         data: PyG Data object containing the training graph
         k_values: List of K values to compute Recall@K for
         batch_size: Number of users to process at once
+        min_interactions: Minimum number of interactions a user must have to be included in evaluation
     """
     model.eval()
     recalls = {k: [] for k in k_values}
     
-    # Convert test_interactions to lists for batching
-    user_indices = list(test_interactions.keys())
+    # Filter users with sufficient interactions
+    qualified_users = [
+        user_idx for user_idx, posts in test_interactions.items()
+        if len(posts) >= min_interactions
+    ]
+    
+    if not qualified_users:
+        print("Warning: No users found with sufficient interactions for evaluation")
+        return {k: 0.0 for k in k_values}
     
     # Get all possible post indices (both from training and test sets)
     all_posts = set()
@@ -27,9 +35,9 @@ def evaluate_recommendations(model, test_interactions, data, k_values=[20, 100, 
     post_indices = torch.tensor(list(all_posts)).to(device)
     
     with torch.no_grad():
-        # Process users in batches
-        for i in tqdm(range(0, len(user_indices), batch_size)):
-            batch_users = user_indices[i:i + batch_size]
+        # Process qualified users in batches
+        for i in tqdm(range(0, len(qualified_users), batch_size)):
+            batch_users = qualified_users[i:i + batch_size]
             
             # Prepare batch tensors
             src_index = torch.tensor(batch_users).to(device)
