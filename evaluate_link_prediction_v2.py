@@ -12,7 +12,7 @@ from models.modules import MergeLayer
 from utils.utils import set_random_seed, convert_to_gpu, get_parameter_sizes
 from utils.utils import get_neighbor_sampler, NegativeEdgeSampler, CandidateEdgeSampler
 from evaluate_models_utils import evaluate_model_link_prediction, evaluate_real
-from utils.DataLoader import get_idx_data_loader, get_link_prediction_data
+from utils.DataLoader import get_idx_data_loader, get_link_prediction_data, get_link_prediction_data_eval
 from utils.EarlyStopping import EarlyStopping
 from utils.load_configs import get_link_prediction_args
 
@@ -26,9 +26,17 @@ if __name__ == "__main__":
     # get data for training, validation and testing
     # node_raw_features, edge_raw_features, full_data, train_data, val_data, test_data, new_node_val_data, new_node_test_data, user_dynamic_features = \
     #     get_link_prediction_data(dataset_name=args.dataset_name, val_ratio=args.val_ratio, test_ratio=args.test_ratio)
-    node_raw_features, edge_raw_features, full_data, _, _, _, new_node_val_data, new_node_test_data = \
-        get_link_prediction_data(dataset_name=args.dataset_name, val_ratio=args.val_ratio, test_ratio=args.test_ratio)
+    node_raw_features, edge_raw_features, full_data, new_node_test_data = \
+        get_link_prediction_data_eval(dataset_name=args.dataset_name, val_ratio=args.val_ratio, test_ratio=args.test_ratio)
 
+    # for evaluating new nodes
+    # result1 = set([node for node in new_node_test_data.src_node_ids if node in train_data.unique_node_ids])
+    # result2 = set([node for node in new_node_test_data.dst_node_ids if node in train_data.unique_node_ids])
+    # print('result1', len(result1))
+    # print('result1', len(result1) / len(set(new_node_test_data.src_node_ids)))
+    # print('result2', len(result2))
+    # print('result2', len(result2) / len(set(new_node_test_data.dst_node_ids)))
+    
     # initialize validation and test neighbor sampler to retrieve temporal graph
     full_neighbor_sampler = get_neighbor_sampler(data=full_data, sample_neighbor_strategy=args.sample_neighbor_strategy,
                                                  time_scaling_factor=args.time_scaling_factor, seed=1)
@@ -36,8 +44,6 @@ if __name__ == "__main__":
     # initialize negative samplers, set seeds for validation and testing so negatives are the same across different runs
     # in the inductive setting, negatives are sampled only amongst other new nodes
     if args.negative_sample_strategy == 'real':
-        new_node_val_neg_edge_sampler = CandidateEdgeSampler(src_node_ids=new_node_val_data.src_node_ids, dst_node_ids=new_node_val_data.dst_node_ids, interact_times=new_node_val_data.node_interact_times)
-        #new_node_val_neg_edge_sampler = CandidateEdgeSampler(src_node_ids=new_node_val_data.src_node_ids, dst_node_ids=new_node_val_data.dst_node_ids, interact_times=new_node_val_data.node_interact_times)
         new_node_test_neg_edge_sampler = CandidateEdgeSampler(src_node_ids=new_node_test_data.src_node_ids, dst_node_ids=new_node_test_data.dst_node_ids, interact_times=new_node_test_data.node_interact_times)        
     elif args.negative_sample_strategy != 'random':
         val_neg_edge_sampler = NegativeEdgeSampler(src_node_ids=full_data.src_node_ids, dst_node_ids=full_data.dst_node_ids,
@@ -60,11 +66,12 @@ if __name__ == "__main__":
 
     # get data loaders
     #val_idx_data_loader = get_idx_data_loader(indices_list=list(range(len(val_data.src_node_ids))), batch_size=args.batch_size, shuffle=False)
-    new_node_val_idx_data_loader = get_idx_data_loader(indices_list=list(range(len(new_node_val_data.src_node_ids))), batch_size=args.batch_size, shuffle=False)
+    #new_node_val_idx_data_loader = get_idx_data_loader(indices_list=list(range(len(new_node_val_data.src_node_ids))), batch_size=args.batch_size, shuffle=False)
     #test_idx_data_loader = get_idx_data_loader(indices_list=list(range(len(test_data.src_node_ids))), batch_size=args.batch_size, shuffle=False)
     new_node_test_idx_data_loader = get_idx_data_loader(indices_list=list(range(len(new_node_test_data.src_node_ids))), batch_size=args.batch_size, shuffle=False)
 
-    new_node_val_metric_all_runs, new_node_test_metric_all_runs = [], []
+    #new_node_val_metric_all_runs, new_node_test_metric_all_runs = [], []
+    new_node_test_metric_all_runs = []
 
     # for inference, args.num_runs should be 1 if im scoring all the candidates
     for run in range(args.num_runs):
@@ -96,7 +103,6 @@ if __name__ == "__main__":
 
         run_start_time = time.time()
         logger.info(f"********** Run {run + 1} starts. **********")
-
         logger.info(f'configuration is {args}')
 
         # create model
@@ -126,15 +132,6 @@ if __name__ == "__main__":
         logger.info(f'get final performance on dataset {args.dataset_name}...')
 
         # the saved best model of memory-based models cannot perform validation since the stored memory has been updated by validation data
-        new_node_val_metrics = evaluate_real(model_name=args.model_name,
-                                                                    model=model,
-                                                                    neighbor_sampler=full_neighbor_sampler,
-                                                                    evaluate_idx_data_loader=new_node_val_idx_data_loader,
-                                                                    evaluate_neg_edge_sampler=new_node_val_neg_edge_sampler,
-                                                                    evaluate_data=new_node_val_data,
-                                                                    num_neighbors=args.num_neighbors,
-                                                                    time_gap=args.time_gap)
-
         new_node_test_metrics = evaluate_real(model_name=args.model_name,
                                                                     model=model,
                                                                     neighbor_sampler=full_neighbor_sampler,
