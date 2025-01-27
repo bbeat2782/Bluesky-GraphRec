@@ -1,0 +1,2 @@
+- [ ] Store the train data and test data from the temporal split so that we don't have to run the load data every time.
+- [ ]
