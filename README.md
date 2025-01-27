@@ -62,11 +62,11 @@ python train_link_prediction.py --dataset_name bluesky --model_name GraphRec --l
 Three (i.e., random, historical, and inductive) negative sampling strategies can be used for model evaluation.
 * Example of evaluating *DyGFormer* with *random* negative sampling strategy on *Wikipedia* dataset:
 ```{bash}
-python evaluate_link_prediction.py --dataset_name wikipedia --model_name DyGFormer --patch_size 2 --max_input_sequence_length 64 --negative_sample_strategy random --num_runs 5 --gpu 0
+python evaluate_link_prediction_v2.py --dataset_name bluesky --model_name GraphRec --patch_size 2 --max_input_sequence_length 64 --negative_sample_strategy real --num_runs 1 --gpu 0
 ```
 * If you want to use the best model configurations to evaluate *DyGFormer* with *random* negative sampling strategy on *Wikipedia* dataset, run
 ```{bash}
-python evaluate_link_prediction.py --dataset_name wikipedia --model_name DyGFormer --negative_sample_strategy random --load_best_configs --num_runs 5 --gpu 0
+python evaluate_link_prediction.py --dataset_name bluesky --model_name GraphRec --negative_sample_strategy real --load_best_configs --num_runs 1 --gpu 0
 ```
 
 
