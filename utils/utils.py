@@ -312,7 +312,6 @@ class CandidateEdgeSampler(object):
         self.src_node_ids = src_node_ids
         self.dst_node_ids = dst_node_ids
         self.interact_times = interact_times
-        self.candidates_cache = {}
 
     def sample(self, size: int, batch_src_node_ids: np.ndarray, batch_dst_node_ids: np.ndarray,
                current_batch_start_time: np.ndarray, current_batch_end_time: float = 0.0):
@@ -325,9 +324,6 @@ class CandidateEdgeSampler(object):
         :param current_batch_end_time: float, end time in the current batch
         :return:
         """
-        # Process each unique start time
-        #unique_times = np.unique(self.interact_times)
-        #print('unique_times:', len(unique_times))
         candidates_dict = {}
         unique_start_times = np.unique(current_batch_start_time)
         for start_time in unique_start_times:
@@ -335,7 +331,7 @@ class CandidateEdgeSampler(object):
             observed_datetime = datetime.strptime(str(int(start_time)), "%Y%m%d%H%M%S")
 
             # Subtract 2 days
-            two_days_before = observed_datetime - timedelta(days=2)
+            two_days_before = observed_datetime - timedelta(hours=2)
 
             # Convert back to float
             two_days_before_float = float(two_days_before.strftime("%Y%m%d%H%M%S"))
@@ -358,28 +354,6 @@ class CandidateEdgeSampler(object):
         selected_time_interval = np.logical_and(self.interact_times >= start_time, self.interact_times <= end_time)
         candidates = set(self.dst_node_ids[selected_time_interval])
         return candidates
-
-    def sample_all_interactions(self, size=10):
-        """
-        Use the sample function to go over all interactions in the dataset.
-        :param size: int, number of sampled negative edges
-        :return: dict, mapping all start times in the dataset to their respective sampled interactions
-        """
-        all_interactions = {}
-        unique_times = np.unique(self.interact_times)
-        print('unique_times:', len(unique_times))
-
-        for start_time in unique_times:
-            # Prepare batch data
-            batch_src_node_ids = self.src_node_ids
-            batch_dst_node_ids = self.dst_node_ids
-            current_batch_start_time = np.array([start_time])
-            
-            # Sample using the `sample` method
-            sampled_candidates = self.sample(size, batch_src_node_ids, batch_dst_node_ids, current_batch_start_time)
-            all_interactions[start_time] = sampled_candidates
-
-        return all_interactions
     
 
 class NegativeEdgeSampler(object):
