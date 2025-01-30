@@ -74,7 +74,7 @@ class NeighborSampler:
     def __init__(self, adj_list: list, sample_neighbor_strategy: str = 'uniform', time_scaling_factor: float = 0.0, seed: int = None):
         """
         Neighbor sampler.
-        :param adj_list: list, list of list, where each element is a list of quadratic tuple (node_id, edge_id, timestamp, idx)
+        :param adj_list: list, list of list, where each element is a list of quadratic tuple (node_id, edge_id, timestamp)
         :param sample_neighbor_strategy: str, how to sample historical neighbors, 'uniform', 'recent', or 'time_interval_aware'
         :param time_scaling_factor: float, a hyper-parameter that controls the sampling preference with time interval,
         a large time_scaling_factor tends to sample more on recent links, this parameter works when sample_neighbor_strategy == 'time_interval_aware'
@@ -87,7 +87,7 @@ class NeighborSampler:
         self.nodes_neighbor_ids = []
         self.nodes_edge_ids = []
         self.nodes_neighbor_times = []
-        self.nodes_neighbor_idx = []
+        #self.nodes_neighbor_idx = []
 
         if self.sample_neighbor_strategy == 'time_interval_aware':
             self.nodes_neighbor_sampled_probabilities = []
@@ -103,7 +103,7 @@ class NeighborSampler:
             self.nodes_neighbor_ids.append(np.array([x[0] for x in sorted_per_node_neighbors]))
             self.nodes_edge_ids.append(np.array([x[1] for x in sorted_per_node_neighbors]))
             self.nodes_neighbor_times.append(np.array([x[2] for x in sorted_per_node_neighbors]))
-            self.nodes_neighbor_idx.append(np.array([x[3] for x in sorted_per_node_neighbors]))
+            #self.nodes_neighbor_idx.append(np.array([x[3] for x in sorted_per_node_neighbors]))
 
             # additional for time interval aware sampling strategy (proposed in CAWN paper)
             if self.sample_neighbor_strategy == 'time_interval_aware':
@@ -147,7 +147,7 @@ class NeighborSampler:
             return self.nodes_neighbor_ids[node_id][:i], self.nodes_edge_ids[node_id][:i], self.nodes_neighbor_times[node_id][:i], \
                    self.nodes_neighbor_sampled_probabilities[node_id][:i]
         else:
-            return self.nodes_neighbor_ids[node_id][:i], self.nodes_edge_ids[node_id][:i], self.nodes_neighbor_times[node_id][:i], None, self.nodes_neighbor_idx[node_id][:i]
+            return self.nodes_neighbor_ids[node_id][:i], self.nodes_edge_ids[node_id][:i], self.nodes_neighbor_times[node_id][:i], None
 
     def get_historical_neighbors(self, node_ids: np.ndarray, node_interact_times: np.ndarray, num_neighbors: int = 20):
         """
@@ -262,19 +262,19 @@ class NeighborSampler:
         :return:
         """
         # three lists to store the first-hop neighbor ids, edge ids and interaction timestamp information, with batch_size as the list length
-        nodes_neighbor_ids_list, nodes_edge_ids_list, nodes_neighbor_times_list, node_neighbor_idx_list = [], [], [], []
+        nodes_neighbor_ids_list, nodes_edge_ids_list, nodes_neighbor_times_list = [], [], []#, []
         # get the temporal neighbors at the first hop
         for idx, (node_id, node_interact_time) in enumerate(zip(node_ids, node_interact_times)):
             # find neighbors that interacted with node_id before time node_interact_time
-            node_neighbor_ids, node_edge_ids, node_neighbor_times, _, node_neighbor_idx = self.find_neighbors_before(node_id=node_id,
+            node_neighbor_ids, node_edge_ids, node_neighbor_times, _ = self.find_neighbors_before(node_id=node_id,
                                                                                                   interact_time=node_interact_time,
                                                                                                   return_sampled_probabilities=False)
             nodes_neighbor_ids_list.append(node_neighbor_ids)
             nodes_edge_ids_list.append(node_edge_ids)
             nodes_neighbor_times_list.append(node_neighbor_times)
-            node_neighbor_idx_list.append(node_neighbor_idx)
+            #node_neighbor_idx_list.append(node_neighbor_idx)
 
-        return nodes_neighbor_ids_list, nodes_edge_ids_list, nodes_neighbor_times_list, node_neighbor_idx_list
+        return nodes_neighbor_ids_list, nodes_edge_ids_list, nodes_neighbor_times_list#, node_neighbor_idx_list
 
     def reset_random_state(self):
         """
@@ -299,9 +299,9 @@ def get_neighbor_sampler(data: Data, sample_neighbor_strategy: str = 'uniform', 
     # adj_list, list of list, where each element is a list of triple tuple (node_id, edge_id, timestamp)
     # the list at the first position in adj_list is empty
     adj_list = [[] for _ in range(max_node_id + 1)]
-    for src_node_id, dst_node_id, edge_id, node_interact_time, idx in zip(data.src_node_ids, data.dst_node_ids, data.edge_ids, data.node_interact_times, data.idx):
-        adj_list[src_node_id].append((dst_node_id, edge_id, node_interact_time, idx))
-        adj_list[dst_node_id].append((src_node_id, edge_id, node_interact_time, idx))
+    for src_node_id, dst_node_id, edge_id, node_interact_time in zip(data.src_node_ids, data.dst_node_ids, data.edge_ids, data.node_interact_times):#, data.idx):
+        adj_list[src_node_id].append((dst_node_id, edge_id, node_interact_time))#, idx))
+        adj_list[dst_node_id].append((src_node_id, edge_id, node_interact_time))##, idx))
 
     return NeighborSampler(adj_list=adj_list, sample_neighbor_strategy=sample_neighbor_strategy, time_scaling_factor=time_scaling_factor, seed=seed)
 
@@ -314,7 +314,7 @@ class CandidateEdgeSampler(object):
         self.interact_times = interact_times
 
     def sample(self, size: int, batch_src_node_ids: np.ndarray, batch_dst_node_ids: np.ndarray,
-               current_batch_start_time: np.ndarray, current_batch_end_time: float = 0.0):
+               current_batch_start_time: np.ndarray, popularity_based=False):
         """
         sample negative edges, support random, historical and inductive sampling strategy
         :param size: int, number of sampled negative edges
@@ -330,19 +330,39 @@ class CandidateEdgeSampler(object):
             # Convert start_time to datetime
             observed_datetime = datetime.strptime(str(int(start_time)), "%Y%m%d%H%M%S")
 
-            # Subtract 2 days
-            two_days_before = observed_datetime - timedelta(hours=2)
+            hour_before = observed_datetime - timedelta(minutes=20)
 
             # Convert back to float
-            two_days_before_float = float(two_days_before.strftime("%Y%m%d%H%M%S"))
+            hour_before_float = float(hour_before.strftime("%Y%m%d%H%M%S"))
 
-            # Fetch unique posts for the time range
-            candidates_dict[start_time] = self.get_unique_posts_between_start_end_time(
-                start_time=two_days_before_float, 
-                end_time=start_time
-            )
+            if popularity_based:
+                candidates_dict[start_time] = self.sort_by_popularity(
+                    start_time=hour_before_float, 
+                    end_time=start_time
+                )
+            else:
+                # Fetch unique posts for the time range
+                candidates_dict[start_time] = self.get_unique_posts_between_start_end_time(
+                    start_time=hour_before_float, 
+                    end_time=start_time
+                )
 
-        return candidates_dict        
+        return candidates_dict
+
+    def sort_by_popularity(self, start_time, end_time):
+        selected_time_interval = np.logical_and(self.interact_times > start_time, self.interact_times <= end_time)
+        dst_node_ids = self.dst_node_ids[selected_time_interval]
+
+        # Count the frequency of each dst_node_id
+        dst_node_id_counts = np.unique(dst_node_ids, return_counts=True)
+        dst_node_ids = dst_node_id_counts[0]
+        counts = dst_node_id_counts[1]
+    
+        # Sort dst_node_ids by their counts in descending order
+        sorted_indices = np.argsort(-counts)  # Negative sign for descending order
+        sorted_dst_node_ids = dst_node_ids[sorted_indices]
+
+        return sorted_dst_node_ids
 
     def get_unique_posts_between_start_end_time(self, start_time: float, end_time: float):
         """
@@ -351,7 +371,7 @@ class CandidateEdgeSampler(object):
         :param end_time: float, end timestamp
         :return: a set of edges, where each edge is a tuple of (src_node_id, dst_node_id)
         """
-        selected_time_interval = np.logical_and(self.interact_times >= start_time, self.interact_times <= end_time)
+        selected_time_interval = np.logical_and(self.interact_times > start_time, self.interact_times <= end_time)
         candidates = set(self.dst_node_ids[selected_time_interval])
         return candidates
     

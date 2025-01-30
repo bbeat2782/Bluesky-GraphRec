@@ -1,7 +1,10 @@
 import pandas as pd
 import torch
 from torch_geometric.data import Data
-from build_user_post_graph import build_user_post_graph
+#from build_user_post_graph import build_user_post_graph
+import pickle
+from datetime import datetime
+
 
 def create_temporal_split(likes_df: pd.DataFrame, split_ratio: float = 0.8) -> tuple[Data, Data, dict]:
     """
@@ -59,3 +62,19 @@ def create_temporal_split(likes_df: pd.DataFrame, split_ratio: float = 0.8) -> t
     print(f"Users with test interactions: {len(test_interactions)}")
     
     return train_data, test_data, test_interactions
+
+def convert_timestamp_to_float(timestamp):
+    """Convert pandas.Timestamp to float in the format YYYYMMDDHHMMSS"""
+    return float(timestamp.strftime("%Y%m%d%H%M%S"))
+
+def create_split_with_time(likes_df, val_time=20230614174507.0, test_time=20230623194726.0):
+    # val_time: 20230614174507.0
+    # test_time: 20230623194726.0
+    
+    # Split the data into train, val, and test sets based on time
+    train_df = likes_df[likes_df['timestamp'] < val_time]
+    val_df = likes_df[(likes_df['timestamp'] >= val_time) & (likes_df['timestamp'] < test_time)]
+    test_df = likes_df[likes_df['timestamp'] >= test_time]
+    
+    return train_df, val_df, test_df
+

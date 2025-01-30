@@ -90,11 +90,17 @@ for i in tqdm(range(0, len(texts), batch_size)):
     batch_texts = texts[i:i + batch_size]
     with torch.no_grad():
         embeddings = model.encode(batch_texts, truncate_dim=128)  # Ensure model compatibility
+        embeddings = embeddings.astype(np.float16)
+        #binary_embeddings = (embeddings > 0).astype(np.uint8)  # Efficient binary transformation
         all_embeddings.extend(embeddings.tolist())
 
 # Store post embeddings
 post_df = post_df.drop(columns=['text'])
 post_df['embeddings'] = all_embeddings
+parquet_file_path = "/home/sgan/private/DyGLib/DG_data/bluesky/bluesky_text_embeddings.parquet"
+#post_df.to_parquet(parquet_file_path, index=False, compression='zstd')
+post_df.to_parquet(parquet_file_path, index=False, compression='zstd', engine='pyarrow')
+
 
 # Get user-post relationships
 user_posts = con.execute("""
@@ -125,6 +131,4 @@ user_df = pd.DataFrame({
     'embeddings': user_embeddings
 })
 
-# Save both post and user embeddings
-post_df.to_parquet("../DG_data/bluesky/bluesky_post_embeddings.parquet", index=False, compression='snappy')
 user_df.to_parquet("../DG_data/bluesky/bluesky_user_embeddings.parquet", index=False, compression='snappy')
