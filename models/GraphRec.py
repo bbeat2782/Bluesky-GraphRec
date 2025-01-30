@@ -10,14 +10,13 @@ import time
 
 class GraphRec(nn.Module):
 
-    def __init__(self, node_raw_features: np.ndarray, edge_raw_features: np.ndarray, user_dynamic_features, neighbor_sampler: NeighborSampler,
+    def __init__(self, node_raw_features: np.ndarray, edge_raw_features: np.ndarray, neighbor_sampler: NeighborSampler,
                  time_feat_dim: int, channel_embedding_dim: int, patch_size: int = 1, num_layers: int = 2, num_heads: int = 2,
                  dropout: float = 0.1, max_input_sequence_length: int = 512, device: str = 'cpu', max_user_feature_dim=2):
         """
         GraphRec model.
         :param node_raw_features: ndarray, shape (num_nodes + 1, node_feat_dim)
         :param edge_raw_features: ndarray, shape (num_edges + 1, edge_feat_dim)
-        :param user_dynamic_features: ndarray, shape (num interactions + 1, max_user_feature_dim) for now
         :param neighbor_sampler: neighbor sampler
         :param time_feat_dim: int, dimension of time features (encodings)
         :param channel_embedding_dim: int, dimension of each channel embedding
@@ -71,12 +70,12 @@ class GraphRec(nn.Module):
         """
         # get the first-hop neighbors of source and destination nodes
         # three lists to store source nodes' first-hop neighbor ids, edge ids and interaction timestamp information, with batch_size as the list length
-        src_nodes_neighbor_ids_list, src_nodes_edge_ids_list, src_nodes_neighbor_times_list, src_nodes_neighbor_idx_list = \
+        src_nodes_neighbor_ids_list, src_nodes_edge_ids_list, src_nodes_neighbor_times_list = \
             self.neighbor_sampler.get_all_first_hop_neighbors(node_ids=src_node_ids, node_interact_times=node_interact_times)
         # print('src_nodes_neighbor_ids_list', src_nodes_neighbor_ids_list[-1])
         # print('src_node_ids', src_node_ids[-1])
         # three lists to store destination nodes' first-hop neighbor ids, edge ids and interaction timestamp information, with batch_size as the list length
-        dst_nodes_neighbor_ids_list, dst_nodes_edge_ids_list, dst_nodes_neighbor_times_list, dst_nodes_neighbor_idx_list = \
+        dst_nodes_neighbor_ids_list, dst_nodes_edge_ids_list, dst_nodes_neighbor_times_list = \
             self.neighbor_sampler.get_all_first_hop_neighbors(node_ids=dst_node_ids, node_interact_times=node_interact_times)
         # print('dst_nodes_neighbor_ids_list', dst_nodes_neighbor_ids_list[-1])
         # print('dst_node_ids', dst_node_ids[-1])
