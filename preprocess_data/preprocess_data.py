@@ -129,6 +129,11 @@ def preprocess_data(dataset_name: str, bipartite: bool = True, node_feat_dim: in
     offset = user_max_id + 2
     text_embeddings['item_id'] = text_embeddings['item_id'] + offset
 
+    # TODO check text_embeddings['item_id'].min() and text_embeddings['item_id'].max()
+    # check text_embeddings['item_id'][108706]
+    # check text_embeddings['item_id'][108707]
+    # check text_embeddings['item_id'][108708]
+
     # node features with one additional feature for zero index (since node id starts from 1)
     max_idx = max(new_df.u.max(), new_df.i.max())
     node_feats = np.zeros((max_idx + 1, node_feat_dim))
