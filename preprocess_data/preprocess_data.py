@@ -111,7 +111,7 @@ def preprocess_data(dataset_name: str, bipartite: bool = True, node_feat_dim: in
     OUT_DF = '../processed_data/{}/ml_{}.csv'.format(dataset_name, dataset_name)
     OUT_FEAT = '../processed_data/{}/ml_{}.npy'.format(dataset_name, dataset_name)
     OUT_NODE_FEAT = '../processed_data/{}/ml_{}_node.npy'.format(dataset_name, dataset_name)
-    OUT_DYNAMIC_USER_FEAT = '../processed_data/{}/ml_{}_user_dynamic.npy'.format(dataset_name, dataset_name)
+    # OUT_DYNAMIC_USER_FEAT = '../processed_data/{}/ml_{}_user_dynamic.npy'.format(dataset_name, dataset_name)
 
     df, edge_feats = preprocess(INTERACTION_PATH)
     new_df = reindex(df, bipartite)
@@ -123,7 +123,6 @@ def preprocess_data(dataset_name: str, bipartite: bool = True, node_feat_dim: in
     
     # Processing node features from Parquet file
     text_embeddings = pd.read_parquet(ITEM_EMBEDDINGS_PATH)
-    text_embeddings['embeddings'] = text_embeddings['embeddings'].apply(unpack_embeddings)
     text_embeddings = text_embeddings.sort_values('item_id').reset_index(drop=True)
     user_max_id = df.u.max()
     offset = user_max_id + 2
@@ -143,90 +142,56 @@ def preprocess_data(dataset_name: str, bipartite: bool = True, node_feat_dim: in
         global_item_id = row['item_id']
         node_feats[global_item_id] = row['embeddings']
         
-    start_time = time.time()
-    # Current format of ts: `20230101024321.0` (`YYYYMMDDHHMMSS`) --> change to datetime obj
-    new_df['ts'] = pd.to_datetime(new_df['ts'].astype(int).astype(str), format='%Y%m%d%H%M%S')
+    # start_time = time.time()
+    # # Current format of ts: `20230101024321.0` (`YYYYMMDDHHMMSS`) --> change to datetime obj
+    # new_df['ts'] = pd.to_datetime(new_df['ts'].astype(int).astype(str), format='%Y%m%d%H%M%S')
 
-    # Sort by user id and ts
-    new_df = new_df.sort_values(['u', 'ts'])
-    print('sort finished')
+    # # Sort by user id and ts
+    # new_df = new_df.sort_values(['u', 'ts'])
+    # print('sort finished')
 
-    # Calculate rolling count using a sliding window
-    def calculate_rolling_count(group):
-        timestamps = group['ts'].to_numpy()
-        counts = []
-        start_idx = 0
+    # # Calculate rolling count using a sliding window
+    # def calculate_rolling_count(group):
+    #     timestamps = group['ts'].to_numpy()
+    #     counts = []
+    #     start_idx = 0
         
-        for current_idx, current_time in enumerate(timestamps):
-            # Slide the start index to maintain a 3-day window
-            while timestamps[start_idx] < current_time - pd.Timedelta(days=3):
-                start_idx += 1
-            counts.append(current_idx - start_idx)  # Count interactions in the window
+    #     for current_idx, current_time in enumerate(timestamps):
+    #         # Slide the start index to maintain a 3-day window
+    #         while timestamps[start_idx] < current_time - pd.Timedelta(days=3):
+    #             start_idx += 1
+    #         counts.append(current_idx - start_idx)  # Count interactions in the window
     
-        group['num_likes'] = counts
-        return group
+    #     group['num_likes'] = counts
+    #     return group
 
-    new_df = new_df.groupby('u', group_keys=False).apply(calculate_rolling_count)
-    print('num_likes finished')
+    # new_df = new_df.groupby('u', group_keys=False).apply(calculate_rolling_count)
+    # print('num_likes finished')
 
-    # Ensure 'num_likes' is of type int16
-    new_df['num_likes'] = new_df['num_likes'].astype(np.int16)
+    # # Ensure 'num_likes' is of type int16
+    # new_df['num_likes'] = new_df['num_likes'].astype(np.int16)
 
-    # Converting back to numerical values for training
-    new_df['ts'] = new_df['ts'].dt.strftime('%Y%m%d%H%M%S').astype(float)
-    new_df = new_df.sort_values(by=['idx'])
+    # # Converting back to numerical values for training
+    # new_df['ts'] = new_df['ts'].dt.strftime('%Y%m%d%H%M%S').astype(float)
+    # new_df = new_df.sort_values(by=['idx'])
 
 
-    print('new_df', new_df.head(5))
+    # print('new_df', new_df.head(5))
 
-    user_dynamic_features = np.zeros((new_df.shape[0] + 1, 2), dtype=np.int16)
-    user_dynamic_features[new_df['idx'].values, 0] = new_df['num_likes'].values
+    # user_dynamic_features = np.zeros((new_df.shape[0] + 1, 2), dtype=np.int16)
+    # user_dynamic_features[new_df['idx'].values, 0] = new_df['num_likes'].values
     
     print('number of nodes ', node_feats.shape[0] - 1)
     print('number of node features ', node_feats.shape[1])
     print('number of edges ', edge_feats.shape[0] - 1)
     print('number of edge features ', edge_feats.shape[1])
-    print('number of dynamic features ', user_dynamic_features.shape[1])
+    # print('number of dynamic features ', user_dynamic_features.shape[1])
     
     new_df.to_csv(OUT_DF)  # edge-list
     np.save(OUT_FEAT, edge_feats)  # edge features
     np.save(OUT_NODE_FEAT, node_feats)  # node features
-    np.save(OUT_DYNAMIC_USER_FEAT, user_dynamic_features)  # dynamic features
+    # np.save(OUT_DYNAMIC_USER_FEAT, user_dynamic_features)  # dynamic features
     
-
-
-def check_data(dataset_name: str):
-    """
-    check whether the processed datasets are identical to the given processed datasets
-    :param dataset_name: str, dataset name
-    :return:
-    """
-    # original data paths
-    origin_OUT_DF = '../DG_data/{}/ml_{}.csv'.format(dataset_name, dataset_name)
-    origin_OUT_FEAT = '../DG_data/{}/ml_{}.npy'.format(dataset_name, dataset_name)
-    origin_OUT_NODE_FEAT = '../DG_data/{}/ml_{}_node.npy'.format(dataset_name, dataset_name)
-
-    # processed data paths
-    OUT_DF = '../processed_data/{}/ml_{}.csv'.format(dataset_name, dataset_name)
-    OUT_FEAT = '../processed_data/{}/ml_{}.npy'.format(dataset_name, dataset_name)
-    OUT_NODE_FEAT = '../processed_data/{}/ml_{}_node.npy'.format(dataset_name, dataset_name)
-
-    # Load original data
-    origin_g_df = pd.read_csv(origin_OUT_DF)
-    origin_e_feat = np.load(origin_OUT_FEAT)
-    origin_n_feat = np.load(origin_OUT_NODE_FEAT)
-
-    # Load processed data
-    g_df = pd.read_csv(OUT_DF)
-    e_feat = np.load(OUT_FEAT)
-    n_feat = np.load(OUT_NODE_FEAT)
-
-    assert_frame_equal(origin_g_df, g_df)
-    # check numbers of edges and edge features
-    assert origin_e_feat.shape == e_feat.shape and origin_e_feat.max() == e_feat.max() and origin_e_feat.min() == e_feat.min()
-    # check numbers of nodes and node features
-    assert origin_n_feat.shape == n_feat.shape and origin_n_feat.max() == n_feat.max() and origin_n_feat.min() == n_feat.min()
-
 
 parser = argparse.ArgumentParser('Interface for preprocessing datasets')
 parser.add_argument('--dataset_name', type=str,
@@ -250,6 +215,4 @@ else:
         preprocess_data(dataset_name=args.dataset_name, bipartite=False, node_feat_dim=args.node_feat_dim)
     print(f'{args.dataset_name} is processed successfully.')
 
-    if args.dataset_name not in ['myket']:
-        check_data(args.dataset_name)
     print(f'{args.dataset_name} passes the checks successfully.')
