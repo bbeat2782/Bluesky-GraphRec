@@ -26,9 +26,23 @@ as well as dynamic node classification.
 
 
 ## Environments
+Follow these steps to set up the `bluesky` environment:
 
-TODO
-
+### **1️⃣ Create the Conda Environment**
+This installs all Conda-managed dependencies.
+```
+conda env create -f environment.yml
+```
+### **2️⃣ Activate the Environment**
+Once the installation is complete, activate the environment.
+```
+conda activate bluesky
+```
+### **3️⃣ Install Additional Pip Packages**
+Some packages, such as torch-geometric, are installed via pip. So to ensure all packages are installed correctly, run:
+```
+pip install -r requirements.txt
+```
 
 ## Executing Scripts
 

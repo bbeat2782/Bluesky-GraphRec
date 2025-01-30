@@ -136,3 +136,8 @@ DG_data/*/*
 processed_data/*/*
 
 two_tower/data/*
+
+notebook.ipynb
+candidates_length.json
+candidates_length_histogram.png
+
