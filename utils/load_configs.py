@@ -46,7 +46,7 @@ def get_link_prediction_args(is_evaluation: bool = False):
     parser.add_argument('--test_ratio', type=float, default=0.15, help='ratio of test set')
     parser.add_argument('--num_runs', type=int, default=5, help='number of runs')
     parser.add_argument('--test_interval_epochs', type=int, default=10, help='how many epochs to perform testing once')
-    parser.add_argument('--negative_sample_strategy', type=str, default='random', choices=['random', 'historical', 'inductive', 'real'],
+    parser.add_argument('--negative_sample_strategy', type=str, default='historical', choices=['random', 'historical', 'inductive', 'real'],
                         help='strategy for the negative edge sampling')
     parser.add_argument('--load_best_configs', action='store_true', default=False, help='whether to load the best configurations')
 
