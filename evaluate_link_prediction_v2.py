@@ -102,29 +102,22 @@ if __name__ == "__main__":
         logger.info(f'get final performance on dataset {args.dataset_name}...')
 
         # the saved best model of memory-based models cannot perform validation since the stored memory has been updated by validation data
-        new_node_test_metrics = evaluate_real(model_name=args.model_name,
-                                                                    model=model,
-                                                                    neighbor_sampler=full_neighbor_sampler,
-                                                                    evaluate_idx_data_loader=test_idx_data_loader,
-                                                                    evaluate_neg_edge_sampler=new_node_test_neg_edge_sampler,
-                                                                    evaluate_data=eval_test_data,
-                                                                    num_neighbors=args.num_neighbors,
-                                                                    time_gap=args.time_gap)
+        avg_mrr = evaluate_real(model_name=args.model_name,
+                                model=model,
+                                neighbor_sampler=full_neighbor_sampler,
+                                evaluate_idx_data_loader=test_idx_data_loader,
+                                evaluate_neg_edge_sampler=new_node_test_neg_edge_sampler,
+                                evaluate_data=eval_test_data,
+                                num_neighbors=args.num_neighbors,
+                                time_gap=args.time_gap)
         
-        raise ValueError()
         # store the evaluation metrics at the current run
         new_node_test_metric_dict = {}
-    
-        logger.info(f'new node test loss: {np.mean(new_node_test_losses):.4f}')
-        for metric_name in new_node_test_metrics[0].keys():
-            average_new_node_test_metric = np.mean([new_node_test_metric[metric_name] for new_node_test_metric in new_node_test_metrics])
-            logger.info(f'new node test {metric_name}, {average_new_node_test_metric:.4f}')
-            new_node_test_metric_dict[metric_name] = average_new_node_test_metric
 
+        logger.info(f'new node test MRR, {avg_mrr:.4f}')
+    
         single_run_time = time.time() - run_start_time
         logger.info(f'Run {run + 1} cost {single_run_time:.2f} seconds.')
-
-        new_node_test_metric_all_runs.append(new_node_test_metric_dict)
 
         # avoid the overlap of logs
         if run < args.num_runs - 1:
@@ -133,7 +126,7 @@ if __name__ == "__main__":
 
         # save model result
         result_json = {
-            "new node test metrics": {metric_name: f'{new_node_test_metric_dict[metric_name]:.4f}' for metric_name in new_node_test_metric_dict}
+            "new node test metrics": {'MRR': f'{avg_mrr:.4f}'}
         }
         result_json = json.dumps(result_json, indent=4)
 
@@ -143,13 +136,5 @@ if __name__ == "__main__":
         with open(save_result_path, 'w') as file:
             file.write(result_json)
         logger.info(f'save negative sampling results at {save_result_path}')
-
-    # store the average metrics at the log of the last run
-    logger.info(f'metrics over {args.num_runs} runs:')
-
-    for metric_name in new_node_test_metric_all_runs[0].keys():
-        logger.info(f'new node test {metric_name}, {[new_node_test_metric_single_run[metric_name] for new_node_test_metric_single_run in new_node_test_metric_all_runs]}')
-        logger.info(f'average new node test {metric_name}, {np.mean([new_node_test_metric_single_run[metric_name] for new_node_test_metric_single_run in new_node_test_metric_all_runs]):.4f} '
-                    f'± {np.std([new_node_test_metric_single_run[metric_name] for new_node_test_metric_single_run in new_node_test_metric_all_runs], ddof=1):.4f}')
 
     sys.exit()

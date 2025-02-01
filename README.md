@@ -52,7 +52,7 @@ If you want to load the best model configurations determined by the grid search,
 #### Model Training
 * Example of training *GraphRec* on *Bluesky* dataset:
 ```{bash}
-python train_link_prediction.py --dataset_name bluesky --model_name GraphRec --patch_size 2 --max_input_sequence_length 64 --num_runs 5 --gpu 0 --batch_size 500
+python train_link_prediction.py --dataset_name bluesky --model_name GraphRec --patch_size 2 --max_input_sequence_length 64 --num_runs 5 --gpu 0 --batch_size 500 --negative_sample_strategy historical
 ```
 #### Model Evaluation
 Three (i.e., random, historical, and inductive) negative sampling strategies can be used for model evaluation.
