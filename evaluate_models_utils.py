@@ -47,6 +47,9 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
             batch_src_node_ids, batch_dst_node_ids, batch_node_interact_times, batch_edge_ids = \
                 evaluate_data.src_node_ids[evaluate_data_indices],  evaluate_data.dst_node_ids[evaluate_data_indices], \
                 evaluate_data.node_interact_times[evaluate_data_indices], evaluate_data.edge_ids[evaluate_data_indices]
+            # For dynamic features
+            batch_src_idx = evaluate_data.idx[evaluate_data_indices]
+            
             popularity_based = False  # TODO make this as an argument
             if popularity_based:
                 candidates_dict = evaluate_neg_edge_sampler.sample(
@@ -89,25 +92,28 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                 batch_candidates = []
                 batch_interact_times = []
                 batch_src_ids = []
+                batch_idx = []
     
-                for src_id, interact_time in zip(batch_src_node_ids, batch_node_interact_times):
+                for src_id, interact_time, src_idx in zip(batch_src_node_ids, batch_node_interact_times, batch_src_idx):
                     candidate_ids = candidates_dict[interact_time]
                     batch_candidates.append(list(candidate_ids))
                     batch_interact_times.append([interact_time] * len(candidate_ids))
                     batch_src_ids.append([src_id] * len(candidate_ids))
+                    batch_idx.append([src_idx] * len(candidate_ids))
     
                 # Flatten batch data for processing
                 batch_candidates = np.concatenate(batch_candidates)
                 batch_interact_times = np.concatenate(batch_interact_times)
                 batch_src_ids = np.concatenate(batch_src_ids)
+                batch_idx = np.concatenate(batch_idx)
     
                 # Compute embeddings in one operation
                 # TODO need to optimize this part
-                src_embeddings, dst_embeddings, _ = model[0].compute_src_dst_node_temporal_embeddings(
+                src_embeddings, dst_embeddings = model[0].compute_src_dst_node_temporal_embeddings(
                     src_node_ids=batch_src_ids,
                     dst_node_ids=batch_candidates,
                     node_interact_times=batch_interact_times,
-                    is_eval=True
+                    batch_src_idx=batch_idx
                 )
     
                 # Compute scores for all user-candidate pairs in the batch
@@ -196,10 +202,13 @@ def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_s
             batch_src_node_ids, batch_dst_node_ids, batch_node_interact_times, batch_edge_ids = \
                 evaluate_data.src_node_ids[evaluate_data_indices],  evaluate_data.dst_node_ids[evaluate_data_indices], \
                 evaluate_data.node_interact_times[evaluate_data_indices], evaluate_data.edge_ids[evaluate_data_indices]
+            # For dynamic features
+            batch_src_idx = evaluate_data.idx[evaluate_data_indices]
 
             _, batch_neg_dst_node_ids = evaluate_neg_edge_sampler.sample(size=len(batch_src_node_ids), current_batch_start_time=batch_node_interact_times)
             # batch_neg_src_node_ids = batch_src_node_ids
             batch_neg_src_node_ids = np.repeat(batch_src_node_ids, 4, axis=0).reshape(len(batch_src_node_ids), 4)
+            batch_neg_src_idx = np.repeat(batch_src_idx, 4, axis=0).reshape(len(batch_src_idx), 4)
 
             # we need to compute for positive and negative edges respectively, because the new sampling strategy (for evaluation) allows the negative source nodes to be
             # different from the source nodes, this is different from previous works that just replace destination nodes with negative destination nodes
@@ -209,20 +218,23 @@ def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_s
                 batch_src_node_embeddings, batch_dst_node_embeddings = \
                     model[0].compute_src_dst_node_temporal_embeddings(src_node_ids=batch_src_node_ids,
                                                                       dst_node_ids=batch_dst_node_ids,
-                                                                      node_interact_times=batch_node_interact_times)
+                                                                      node_interact_times=batch_node_interact_times,
+                                                                      batch_src_idx=batch_src_idx)
 
             
                 # Flatten negative samples to compute embeddings properly
                 batch_neg_src_node_ids_flat = batch_neg_src_node_ids.flatten()  # (batch_size * 4,)
                 batch_neg_dst_node_ids_flat = batch_neg_dst_node_ids.flatten()  # (batch_size * 4,)
                 batch_neg_times_flat = np.repeat(batch_node_interact_times, 4, axis=0).flatten()  # (batch_size * 4,)
+                batch_neg_src_idx_flat = batch_neg_src_idx.flatten()  # (batch_size * 4,)
 
                 # get temporal embedding of negative source and negative destination nodes
                 # two Tensors, with shape (batch_size, node_feat_dim)
                 batch_neg_src_node_embeddings, batch_neg_dst_node_embeddings = \
                     model[0].compute_src_dst_node_temporal_embeddings(src_node_ids=batch_neg_src_node_ids_flat,
                                                                       dst_node_ids=batch_neg_dst_node_ids_flat,
-                                                                      node_interact_times=batch_neg_times_flat)
+                                                                      node_interact_times=batch_neg_times_flat,
+                                                                      batch_src_idx=batch_neg_src_idx_flat)
 
                 # Reshape back to (batch_size, 4, node_feat_dim) so that each positive has 4 negatives
                 node_feat_dim = batch_neg_src_node_embeddings.shape[1]  # Get feature dimension
@@ -264,86 +276,3 @@ def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_s
             evaluate_idx_data_loader_tqdm.set_description(f'evaluate for the {batch_idx + 1}-th batch, evaluate loss: {bpr_loss.item()}')
 
     return evaluate_losses, evaluate_metrics
-
-# def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_sampler: NeighborSampler, evaluate_idx_data_loader: DataLoader,
-#                                    evaluate_neg_edge_sampler: NegativeEdgeSampler, evaluate_data: Data, loss_func: nn.Module,
-#                                    num_neighbors: int = 20, time_gap: int = 2000):
-#     """
-#     evaluate models on the link prediction task
-#     :param model_name: str, name of the model
-#     :param model: nn.Module, the model to be evaluated
-#     :param neighbor_sampler: NeighborSampler, neighbor sampler
-#     :param evaluate_idx_data_loader: DataLoader, evaluate index data loader
-#     :param evaluate_neg_edge_sampler: NegativeEdgeSampler, evaluate negative edge sampler
-#     :param evaluate_data: Data, data to be evaluated
-#     :param loss_func: nn.Module, loss function
-#     :param num_neighbors: int, number of neighbors to sample for each node
-#     :param time_gap: int, time gap for neighbors to compute node features
-#     :return:
-#     """
-#     # Ensures the random sampler uses a fixed seed for evaluation (i.e. we always sample the same negatives for validation / test set)
-#     assert evaluate_neg_edge_sampler.seed is not None
-#     evaluate_neg_edge_sampler.reset_random_state()
-
-#     if model_name in ['GraphRec']:
-#         # evaluation phase use all the graph information
-#         model[0].set_neighbor_sampler(neighbor_sampler)
-
-#     model.eval()
-
-#     with torch.no_grad():
-#         # store evaluate losses and metrics
-#         evaluate_losses, evaluate_metrics = [], []
-#         evaluate_idx_data_loader_tqdm = tqdm(evaluate_idx_data_loader, ncols=120)
-#         for batch_idx, evaluate_data_indices in enumerate(evaluate_idx_data_loader_tqdm):
-#             evaluate_data_indices = evaluate_data_indices.numpy()
-#             # print('evaluate_data_indices', evaluate_data_indices)
-#             # raise ValueError()
-#             batch_src_node_ids, batch_dst_node_ids, batch_node_interact_times, batch_edge_ids = \
-#                 evaluate_data.src_node_ids[evaluate_data_indices],  evaluate_data.dst_node_ids[evaluate_data_indices], \
-#                 evaluate_data.node_interact_times[evaluate_data_indices], evaluate_data.edge_ids[evaluate_data_indices]
-
-#             if evaluate_neg_edge_sampler.negative_sample_strategy != 'random':
-#                 batch_neg_src_node_ids, batch_neg_dst_node_ids = evaluate_neg_edge_sampler.sample(size=len(batch_src_node_ids),
-#                                                                                                   batch_src_node_ids=batch_src_node_ids,
-#                                                                                                   batch_dst_node_ids=batch_dst_node_ids,
-#                                                                                                   current_batch_start_time=batch_node_interact_times[0],
-#                                                                                                   current_batch_end_time=batch_node_interact_times[-1])
-#             else:
-#                 _, batch_neg_dst_node_ids = evaluate_neg_edge_sampler.sample(size=len(batch_src_node_ids))
-#                 batch_neg_src_node_ids = batch_src_node_ids
-
-#             # we need to compute for positive and negative edges respectively, because the new sampling strategy (for evaluation) allows the negative source nodes to be
-#             # different from the source nodes, this is different from previous works that just replace destination nodes with negative destination nodes
-#             if model_name in ['GraphRec']:
-#                 # get temporal embedding of source and destination nodes
-#                 # two Tensors, with shape (batch_size, node_feat_dim)
-#                 batch_src_node_embeddings, batch_dst_node_embeddings = \
-#                     model[0].compute_src_dst_node_temporal_embeddings(src_node_ids=batch_src_node_ids,
-#                                                                       dst_node_ids=batch_dst_node_ids,
-#                                                                       node_interact_times=batch_node_interact_times)
-
-#                 # get temporal embedding of negative source and negative destination nodes
-#                 # two Tensors, with shape (batch_size, node_feat_dim)
-#                 batch_neg_src_node_embeddings, batch_neg_dst_node_embeddings = \
-#                     model[0].compute_src_dst_node_temporal_embeddings(src_node_ids=batch_neg_src_node_ids,
-#                                                                       dst_node_ids=batch_neg_dst_node_ids,
-#                                                                       node_interact_times=batch_node_interact_times)
-#             else:
-#                 raise ValueError(f"Wrong value for model_name {model_name}!")
-#             # get positive and negative probabilities, shape (batch_size, )
-#             positive_probabilities = model[1](input_1=batch_src_node_embeddings, input_2=batch_dst_node_embeddings).squeeze(dim=-1).sigmoid()
-#             negative_probabilities = model[1](input_1=batch_neg_src_node_embeddings, input_2=batch_neg_dst_node_embeddings).squeeze(dim=-1).sigmoid()
-
-#             predicts = torch.cat([positive_probabilities, negative_probabilities], dim=0)
-#             labels = torch.cat([torch.ones_like(positive_probabilities), torch.zeros_like(negative_probabilities)], dim=0)
-
-#             loss = loss_func(input=predicts, target=labels)
-
-#             evaluate_losses.append(loss.item())
-
-#             evaluate_metrics.append(get_link_prediction_metrics(predicts=predicts, labels=labels))
-
-#             evaluate_idx_data_loader_tqdm.set_description(f'evaluate for the {batch_idx + 1}-th batch, evaluate loss: {loss.item()}')
-
-#     return evaluate_losses, evaluate_metrics

@@ -101,36 +101,3 @@ post_df['embeddings'] = all_embeddings
 parquet_file_path = "/home/sgan/private/DyGLib/DG_data/bluesky/bluesky_text_embeddings.parquet"
 #post_df.to_parquet(parquet_file_path, index=False, compression='zstd')
 post_df.to_parquet(parquet_file_path, index=False, compression='zstd', engine='pyarrow')
-
-
-# TODO need to check whether this is working or not
-# # Get user-post relationships
-# user_posts = con.execute("""
-#     SELECT repo AS userId, CONCAT(repo, '_', rkey) AS post_key
-#     FROM records
-#     WHERE createdAt >= '2023-01-01' AND collection == 'app.bsky.feed.post'
-# """).fetchdf()
-
-# # Map post keys to sequential IDs
-# user_posts['post_key'] = user_posts['post_key'].map(post_mapping)
-# user_posts = user_posts[~user_posts['post_key'].isna()]
-# user_posts['userId'] = user_posts['userId'].map(user_mapping)
-
-# # Calculate average embeddings for each user
-# user_embeddings = []
-# for user_id in tqdm(range(len(user_mapping))):
-#     user_post_ids = user_posts[user_posts['userId'] == user_id]['post_key'].values
-#     if len(user_post_ids) > 0:
-#         user_post_embeddings = post_df[post_df['item_id'].isin(user_post_ids)]['embeddings'].values
-#         avg_embedding = np.mean(user_post_embeddings, axis=0)
-#     else:
-#         avg_embedding = np.zeros(128)  # Default embedding for users with no posts
-#     user_embeddings.append(avg_embedding)
-
-# # Create user embeddings dataframe
-# user_df = pd.DataFrame({
-#     'user_id': range(len(user_mapping)),
-#     'embeddings': user_embeddings
-# })
-
-# user_df.to_parquet("../DG_data/bluesky/bluesky_user_embeddings.parquet", index=False, compression='snappy')

@@ -46,7 +46,7 @@ def get_idx_data_loader(indices_list: list, batch_size: int, shuffle: bool):
 
 class Data:
 
-    def __init__(self, src_node_ids: np.ndarray, dst_node_ids: np.ndarray, node_interact_times: np.ndarray, edge_ids: np.ndarray, labels: np.ndarray):#, idx):
+    def __init__(self, src_node_ids: np.ndarray, dst_node_ids: np.ndarray, node_interact_times: np.ndarray, edge_ids: np.ndarray, labels: np.ndarray, idx, src_max_id):
         """
         Data object to store the nodes interaction information.
         :param src_node_ids: ndarray
@@ -60,10 +60,11 @@ class Data:
         self.node_interact_times = node_interact_times
         self.edge_ids = edge_ids
         self.labels = labels
-        # self.idx = idx
+        self.idx = idx
         self.num_interactions = len(src_node_ids)
         self.unique_node_ids = set(src_node_ids) | set(dst_node_ids)
         self.num_unique_nodes = len(self.unique_node_ids)
+        self.src_max_id = src_max_id
 
 
 def get_link_prediction_data(dataset_name: str, val_ratio: float, test_ratio: float):
@@ -79,10 +80,14 @@ def get_link_prediction_data(dataset_name: str, val_ratio: float, test_ratio: fl
     graph_df = pd.read_csv('./processed_data/{}/ml_{}.csv'.format(dataset_name, dataset_name))
     edge_raw_features = np.load('./processed_data/{}/ml_{}.npy'.format(dataset_name, dataset_name))
     node_raw_features = np.load('./processed_data/{}/ml_{}_node.npy'.format(dataset_name, dataset_name))
-    #dynamic_feature_file_path = './processed_data/{}/ml_{}_user_dynamic.pkl'.format(dataset_name, dataset_name)
-    # with open(dynamic_feature_file_path, 'rb') as f:
-    #     user_dynamic_features = pickle.load(f)
-    # user_dynamic_features = np.load('./processed_data/{}/ml_{}_user_dynamic.npy'.format(dataset_name, dataset_name))
+    dynamic_user_features_path = '/home/sgan/user_dynamic_features.npz'
+    dynamic_user_features_npz = np.load(dynamic_user_features_path, allow_pickle=True)  # Allow lists inside NPZ
+
+    # Extract the correct key
+    dynamic_user_features_list = dynamic_user_features_npz['user_dynamic_features']  # This is a list
+    
+    # Convert to NumPy array before changing dtype
+    dynamic_user_features = np.array(dynamic_user_features_list, dtype=np.float16)
 
     NODE_FEAT_DIM = EDGE_FEAT_DIM = 128
 
@@ -98,20 +103,25 @@ def get_link_prediction_data(dataset_name: str, val_ratio: float, test_ratio: fl
 
     assert NODE_FEAT_DIM == node_raw_features.shape[1] and EDGE_FEAT_DIM == edge_raw_features.shape[1], 'Unaligned feature dimensions after feature padding!'
 
+    node_interact_times = graph_df.ts.values.astype(np.float64)
+    min_timestamp = node_interact_times.min()
+    node_interact_times = (graph_df.ts.values - min_timestamp).astype(np.int32)
+    graph_df.ts = node_interact_times
+    
     # get the timestamp of validate and test set
     val_time, test_time = list(np.quantile(graph_df.ts, [(1 - val_ratio - test_ratio), (1 - test_ratio)]))
+  
+    src_node_ids = graph_df.u.values.astype(np.int32)
+    dst_node_ids = graph_df.i.values.astype(np.int32)
+    edge_ids = graph_df.idx.values.astype(np.int32)
+    labels = graph_df.label.values.astype(np.int8) 
+    idx = graph_df.idx.values.astype(np.int32)
+    src_max_id = np.max(src_node_ids)
+    print('src_max_id', src_max_id)
+    print('Num of users', len(np.unique(src_node_ids)))
+    print('Num of posts', len(np.unique(dst_node_ids)))
 
-    print('val_time:', val_time)
-    print('test_time:', test_time)
-
-    src_node_ids = graph_df.u.values.astype(np.longlong)
-    dst_node_ids = graph_df.i.values.astype(np.longlong)
-    node_interact_times = graph_df.ts.values.astype(np.float64)
-    edge_ids = graph_df.idx.values.astype(np.longlong)
-    labels = graph_df.label.values
-    # idx = graph_df.idx.values
-
-    full_data = Data(src_node_ids=src_node_ids, dst_node_ids=dst_node_ids, node_interact_times=node_interact_times, edge_ids=edge_ids, labels=labels,)# idx=idx)
+    full_data = Data(src_node_ids=src_node_ids, dst_node_ids=dst_node_ids, node_interact_times=node_interact_times, edge_ids=edge_ids, labels=labels, idx=idx, src_max_id=src_max_id)
 
     # the setting of seed follows previous works
     random.seed(2020)
@@ -140,7 +150,7 @@ def get_link_prediction_data(dataset_name: str, val_ratio: float, test_ratio: fl
 
     train_data = Data(src_node_ids=src_node_ids[train_mask], dst_node_ids=dst_node_ids[train_mask],
                       node_interact_times=node_interact_times[train_mask],
-                      edge_ids=edge_ids[train_mask], labels=labels[train_mask])#, idx=idx[train_mask])
+                      edge_ids=edge_ids[train_mask], labels=labels[train_mask], idx=idx[train_mask], src_max_id=src_max_id)
 
     # define the new nodes sets for testing inductiveness of the model
     train_node_set = set(train_data.src_node_ids).union(train_data.dst_node_ids)
@@ -159,19 +169,19 @@ def get_link_prediction_data(dataset_name: str, val_ratio: float, test_ratio: fl
 
     # validation and test data
     val_data = Data(src_node_ids=src_node_ids[val_mask], dst_node_ids=dst_node_ids[val_mask],
-                    node_interact_times=node_interact_times[val_mask], edge_ids=edge_ids[val_mask], labels=labels[val_mask])#, idx=idx[val_mask])
+                    node_interact_times=node_interact_times[val_mask], edge_ids=edge_ids[val_mask], labels=labels[val_mask], idx=idx[val_mask], src_max_id=src_max_id)
 
     test_data = Data(src_node_ids=src_node_ids[test_mask], dst_node_ids=dst_node_ids[test_mask],
-                     node_interact_times=node_interact_times[test_mask], edge_ids=edge_ids[test_mask], labels=labels[test_mask])#, idx=idx[test_mask])
+                     node_interact_times=node_interact_times[test_mask], edge_ids=edge_ids[test_mask], labels=labels[test_mask], idx=idx[test_mask], src_max_id=src_max_id)
 
     # validation and test with edges that at least has one new node (not in training set)
     new_node_val_data = Data(src_node_ids=src_node_ids[new_node_val_mask], dst_node_ids=dst_node_ids[new_node_val_mask],
                              node_interact_times=node_interact_times[new_node_val_mask],
-                             edge_ids=edge_ids[new_node_val_mask], labels=labels[new_node_val_mask])#, idx=idx[new_node_val_mask])
+                             edge_ids=edge_ids[new_node_val_mask], labels=labels[new_node_val_mask], idx=idx[new_node_val_mask], src_max_id=src_max_id)
 
     new_node_test_data = Data(src_node_ids=src_node_ids[new_node_test_mask], dst_node_ids=dst_node_ids[new_node_test_mask],
                               node_interact_times=node_interact_times[new_node_test_mask],
-                              edge_ids=edge_ids[new_node_test_mask], labels=labels[new_node_test_mask])#, idx=idx[new_node_test_mask])
+                              edge_ids=edge_ids[new_node_test_mask], labels=labels[new_node_test_mask], idx=idx[new_node_test_mask], src_max_id=src_max_id)
 
     print("The dataset has {} interactions, involving {} different nodes".format(full_data.num_interactions, full_data.num_unique_nodes))
     print("The training dataset has {} interactions, involving {} different nodes".format(
@@ -186,7 +196,7 @@ def get_link_prediction_data(dataset_name: str, val_ratio: float, test_ratio: fl
         new_node_test_data.num_interactions, new_node_test_data.num_unique_nodes))
     print("{} nodes were used for the inductive testing, i.e. are never seen during training".format(len(new_test_node_set)))
 
-    return node_raw_features, edge_raw_features, full_data, train_data, val_data, test_data, new_node_val_data, new_node_test_data
+    return node_raw_features, edge_raw_features, full_data, train_data, val_data, test_data, new_node_val_data, new_node_test_data, dynamic_user_features
 
 
 def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_ratio: float):
@@ -202,6 +212,14 @@ def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_rati
     graph_df = pd.read_csv('./processed_data/{}/ml_{}.csv'.format(dataset_name, dataset_name))
     edge_raw_features = np.load('./processed_data/{}/ml_{}.npy'.format(dataset_name, dataset_name))
     node_raw_features = np.load('./processed_data/{}/ml_{}_node.npy'.format(dataset_name, dataset_name))
+    dynamic_user_features_path = '/home/sgan/user_dynamic_features.npz'
+    dynamic_user_features_npz = np.load(dynamic_user_features_path, allow_pickle=True)  # Allow lists inside NPZ
+
+    # Extract the correct key
+    dynamic_user_features_list = dynamic_user_features_npz['user_dynamic_features']  # This is a list
+    
+    # Convert to NumPy array before changing dtype
+    dynamic_user_features = np.array(dynamic_user_features_list, dtype=np.float16)
 
     NODE_FEAT_DIM = EDGE_FEAT_DIM = 128
 
@@ -217,20 +235,27 @@ def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_rati
 
     assert NODE_FEAT_DIM == node_raw_features.shape[1] and EDGE_FEAT_DIM == edge_raw_features.shape[1], 'Unaligned feature dimensions after feature padding!'
 
+    node_interact_times = graph_df.ts.values.astype(np.float64)
+    min_timestamp = node_interact_times.min()
+    node_interact_times = (graph_df.ts.values - min_timestamp).astype(np.int32)
+    graph_df.ts = node_interact_times
+
     # get the timestamp of validate and test set
     val_time, test_time = list(np.quantile(graph_df.ts, [(1 - val_ratio - test_ratio), (1 - test_ratio)]))
 
+    # TODO change to human readable format
     print('val_time:', val_time)
     print('test_time:', test_time)
 
     src_node_ids = graph_df.u.values.astype(np.longlong)
     dst_node_ids = graph_df.i.values.astype(np.longlong)
-    node_interact_times = graph_df.ts.values.astype(np.float64)
+    # node_interact_times = graph_df.ts.values.astype(np.float64)
     edge_ids = graph_df.idx.values.astype(np.longlong)
     labels = graph_df.label.values
-    #idx = graph_df.idx.values
+    idx = graph_df.idx.values
+    src_max_id = np.max(src_node_ids)
 
-    full_data = Data(src_node_ids=src_node_ids, dst_node_ids=dst_node_ids, node_interact_times=node_interact_times, edge_ids=edge_ids, labels=labels)#, idx=idx)
+    full_data = Data(src_node_ids=src_node_ids, dst_node_ids=dst_node_ids, node_interact_times=node_interact_times, edge_ids=edge_ids, labels=labels, idx=idx, src_max_id=src_max_id)
 
     # the setting of seed follows previous works
     random.seed(2020)
@@ -259,7 +284,7 @@ def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_rati
 
     train_data = Data(src_node_ids=src_node_ids[train_mask], dst_node_ids=dst_node_ids[train_mask],
                       node_interact_times=node_interact_times[train_mask],
-                      edge_ids=edge_ids[train_mask], labels=labels[train_mask])#, idx=idx[train_mask])
+                      edge_ids=edge_ids[train_mask], labels=labels[train_mask], idx=idx[train_mask], src_max_id=src_max_id)
 
     # define the new nodes sets for testing inductiveness of the model
     train_node_set = set(train_data.src_node_ids).union(train_data.dst_node_ids)
@@ -271,7 +296,7 @@ def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_rati
     test_mask = node_interact_times > test_time
 
     test_data = Data(src_node_ids=src_node_ids[val_mask], dst_node_ids=dst_node_ids[val_mask],
-                     node_interact_times=node_interact_times[val_mask], edge_ids=edge_ids[val_mask], labels=labels[val_mask])
+                     node_interact_times=node_interact_times[val_mask], edge_ids=edge_ids[val_mask], labels=labels[val_mask], idx=idx[val_mask], src_max_id=src_max_id)
 
     # Filter relevant data for new node test
     filtered_src_node_ids = src_node_ids[val_mask]
@@ -279,9 +304,10 @@ def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_rati
     filtered_node_interact_times = node_interact_times[val_mask]
     filtered_edge_ids = edge_ids[val_mask]
     filtered_labels = labels[val_mask]
+    filtered_idx = idx[val_mask]
 
     
-    length_restrict = int(0.005 * len(filtered_src_node_ids))
+    length_restrict = int(0.01 * len(filtered_src_node_ids))
 
     interactions_df = pd.DataFrame({
         'src_node_id': filtered_src_node_ids[:length_restrict],
@@ -289,6 +315,7 @@ def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_rati
         'node_interact_time': filtered_node_interact_times[:length_restrict],
         'edge_id': filtered_edge_ids[:length_restrict],
         'label': filtered_labels[:length_restrict],
+        'idx': filtered_idx[:length_restrict]
     })
 
     # Sort by src_node_id and node_interact_time
@@ -304,6 +331,8 @@ def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_rati
         node_interact_times=last_interactions['node_interact_time'].values,
         edge_ids=last_interactions['edge_id'].values,
         labels=last_interactions['label'].values,
+        idx=last_interactions['idx'].values,
+        src_max_id=src_max_id
     )
 
     print("The dataset has {} interactions, involving {} different nodes".format(full_data.num_interactions, full_data.num_unique_nodes))
@@ -311,4 +340,4 @@ def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_rati
         eval_test_data.num_interactions, eval_test_data.num_unique_nodes))
     print("{} nodes were used for the inductive testing, i.e. are never seen during training".format(len(new_test_node_set)))
 
-    return node_raw_features, edge_raw_features, full_data, test_data, eval_test_data
+    return node_raw_features, edge_raw_features, full_data, test_data, eval_test_data, dynamic_user_features

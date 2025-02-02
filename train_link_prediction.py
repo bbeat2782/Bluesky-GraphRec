@@ -9,6 +9,7 @@ import shutil
 import json
 import torch
 import torch.nn as nn
+from torch.amp import autocast
 
 from models.GraphRec import GraphRec
 from models.modules import MergeLayer
@@ -28,7 +29,7 @@ if __name__ == "__main__":
     args = get_link_prediction_args(is_evaluation=False)
 
     # get data for training, validation and testing
-    node_raw_features, edge_raw_features, full_data, train_data, val_data, test_data, new_node_val_data, new_node_test_data = \
+    node_raw_features, _, full_data, train_data, val_data, test_data, new_node_val_data, new_node_test_data, user_dynamic_features = \
         get_link_prediction_data(dataset_name=args.dataset_name, val_ratio=args.val_ratio, test_ratio=args.test_ratio)
 
     # initialize training neighbor sampler to retrieve temporal graph
@@ -40,15 +41,6 @@ if __name__ == "__main__":
                                                  time_scaling_factor=args.time_scaling_factor, seed=1)
 
     # initialize negative samplers, set seeds for validation and testing so negatives are the same across different runs
-    # in the inductive setting, negatives are sampled only amongst other new nodes
-    # train negative edge sampler does not need to specify the seed, but evaluation samplers need to do so
-    # train_neg_edge_sampler = NegativeEdgeSampler(src_node_ids=train_data.src_node_ids, dst_node_ids=train_data.dst_node_ids)
-    # val_neg_edge_sampler = NegativeEdgeSampler(src_node_ids=full_data.src_node_ids, dst_node_ids=full_data.dst_node_ids, seed=0)
-    # new_node_val_neg_edge_sampler = NegativeEdgeSampler(src_node_ids=new_node_val_data.src_node_ids, dst_node_ids=new_node_val_data.dst_node_ids, seed=1)
-    # test_neg_edge_sampler = NegativeEdgeSampler(src_node_ids=full_data.src_node_ids, dst_node_ids=full_data.dst_node_ids, seed=2)
-    # new_node_test_neg_edge_sampler = NegativeEdgeSampler(src_node_ids=new_node_test_data.src_node_ids, dst_node_ids=new_node_test_data.dst_node_ids, seed=3)
-
-    # Currently implementing
     train_neg_edge_sampler = MultipleNegativeEdgeSampler(src_node_ids=train_data.src_node_ids, dst_node_ids=train_data.dst_node_ids, seed=2025, negative_sample_strategy=args.negative_sample_strategy, interact_times=train_data.node_interact_times)
     val_neg_edge_sampler = MultipleNegativeEdgeSampler(src_node_ids=full_data.src_node_ids, dst_node_ids=full_data.dst_node_ids, seed=0, negative_sample_strategy=args.negative_sample_strategy, interact_times=full_data.node_interact_times)
     new_node_val_neg_edge_sampler = MultipleNegativeEdgeSampler(src_node_ids=new_node_val_data.src_node_ids, dst_node_ids=new_node_val_data.dst_node_ids, seed=1, negative_sample_strategy=args.negative_sample_strategy, interact_times=new_node_val_data.node_interact_times)
@@ -97,10 +89,10 @@ if __name__ == "__main__":
 
         # create model
         if args.model_name == 'GraphRec':
-            dynamic_backbone = GraphRec(node_raw_features=node_raw_features, edge_raw_features=edge_raw_features, neighbor_sampler=train_neighbor_sampler,
+            dynamic_backbone = GraphRec(node_raw_features=node_raw_features, neighbor_sampler=train_neighbor_sampler,
                                          time_feat_dim=args.time_feat_dim, channel_embedding_dim=args.channel_embedding_dim, patch_size=args.patch_size,
                                          num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout,
-                                         max_input_sequence_length=args.max_input_sequence_length, device=args.device)
+                                         max_input_sequence_length=args.max_input_sequence_length, device=args.device, user_dynamic_features=user_dynamic_features, src_max_id=train_data.src_max_id)
         else:
             raise ValueError(f"Wrong value for model_name {args.model_name}!")
         link_predictor = MergeLayer(input_dim1=node_raw_features.shape[1], input_dim2=node_raw_features.shape[1],
@@ -146,35 +138,39 @@ if __name__ == "__main__":
                     train_data.src_node_ids[train_data_indices], train_data.dst_node_ids[train_data_indices], \
                     train_data.node_interact_times[train_data_indices], train_data.edge_ids[train_data_indices]
                 # For dynamic features
-                # batch_src_idx = train_data.idx[train_data_indices]
+                batch_src_idx = train_data.idx[train_data_indices]
 
                 # batch_neg_dst_node_ids.shape: (batch_size, 4)
                 _, batch_neg_dst_node_ids = train_neg_edge_sampler.sample(size=len(batch_src_node_ids), current_batch_start_time=batch_node_interact_times)
 
                 # batch_neg_src_node_ids = batch_src_node_ids
                 batch_neg_src_node_ids = np.repeat(batch_src_node_ids, 4, axis=0).reshape(len(batch_src_node_ids), 4)
+                batch_neg_src_idx = np.repeat(batch_src_idx, 4, axis=0).reshape(len(batch_src_idx), 4)
 
                 # we need to compute for positive and negative edges respectively, because the new sampling strategy (for evaluation) allows the negative source nodes to be
                 # different from the source nodes, this is different from previous works that just replace destination nodes with negative destination nodes
                 if args.model_name in ['GraphRec']:
                     # get temporal embedding of source and destination nodes
                     # two Tensors, with shape (batch_size, node_feat_dim)
+                    #with autocast(device_type="cuda", dtype=torch.float16):
                     batch_src_node_embeddings, batch_dst_node_embeddings = \
                         model[0].compute_src_dst_node_temporal_embeddings(src_node_ids=batch_src_node_ids,
                                                                           dst_node_ids=batch_dst_node_ids,
-                                                                          node_interact_times=batch_node_interact_times)#,
-                                                                          #batch_src_idx=batch_src_idx)
+                                                                          node_interact_times=batch_node_interact_times,
+                                                                          batch_src_idx=batch_src_idx)
                     # Flatten negative samples to compute embeddings properly
                     batch_neg_src_node_ids_flat = batch_neg_src_node_ids.flatten()  # (batch_size * 4,)
                     batch_neg_dst_node_ids_flat = batch_neg_dst_node_ids.flatten()  # (batch_size * 4,)
                     batch_neg_times_flat = np.repeat(batch_node_interact_times, 4, axis=0).flatten()  # (batch_size * 4,)
+                    batch_neg_src_idx_flat = batch_neg_src_idx.flatten()  # (batch_size * 4,)
 
                     # get temporal embedding of negative source and negative destination nodes
                     # two Tensors, with shape (batch_size, node_feat_dim)
                     batch_neg_src_node_embeddings, batch_neg_dst_node_embeddings = \
                         model[0].compute_src_dst_node_temporal_embeddings(src_node_ids=batch_neg_src_node_ids_flat,
                                                                           dst_node_ids=batch_neg_dst_node_ids_flat,
-                                                                          node_interact_times=batch_neg_times_flat)
+                                                                          node_interact_times=batch_neg_times_flat,
+                                                                          batch_src_idx=batch_neg_src_idx_flat)
 
                     # Reshape back to (batch_size, 4, node_feat_dim) so that each positive has 4 negatives
                     node_feat_dim = batch_neg_src_node_embeddings.shape[1]  # Get feature dimension
@@ -188,7 +184,7 @@ if __name__ == "__main__":
                 # Flatten negatives for processing
                 batch_neg_src_node_embeddings_flat = batch_neg_src_node_embeddings.view(-1, embedding_dim)  # (batch_size * 4, embedding_dim)
                 batch_neg_dst_node_embeddings_flat = batch_neg_dst_node_embeddings.view(-1, embedding_dim)  # (batch_size * 4, embedding_dim)
-                
+                #with autocast(device_type="cuda", dtype=torch.float16):
                 positive_scores = model[1](input_1=batch_src_node_embeddings, input_2=batch_dst_node_embeddings).squeeze(dim=-1)
 
                 negative_scores = model[1](
