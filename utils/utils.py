@@ -327,17 +327,36 @@ class CandidateEdgeSampler(object):
         candidates_dict = {}
         unique_start_times = np.unique(current_batch_start_time)
         for start_time in unique_start_times:
-            twenty_mins_before = start_time - 20
+            # twenty_mins_before = start_time - 20
+
+            # if popularity_based:
+            #     candidates_dict[start_time] = self.sort_by_popularity(
+            #         start_time=twenty_mins_before, 
+            #         end_time=start_time
+            #     )
+            # else:
+            #     # Fetch unique posts for the time range
+            #     candidates_dict[start_time] = self.get_unique_posts_between_start_end_time(
+            #         start_time=twenty_mins_before, 
+            #         end_time=start_time
+            #     )
+            # Convert start_time to datetime
+            observed_datetime = datetime.strptime(str(int(start_time)), "%Y%m%d%H%M%S")
+
+            hour_before = observed_datetime - timedelta(minutes=20)
+
+            # Convert back to float
+            hour_before_float = float(hour_before.strftime("%Y%m%d%H%M%S"))
 
             if popularity_based:
                 candidates_dict[start_time] = self.sort_by_popularity(
-                    start_time=twenty_mins_before, 
+                    start_time=hour_before_float, 
                     end_time=start_time
                 )
             else:
                 # Fetch unique posts for the time range
                 candidates_dict[start_time] = self.get_unique_posts_between_start_end_time(
-                    start_time=twenty_mins_before, 
+                    start_time=hour_before_float, 
                     end_time=start_time
                 )
 
@@ -735,15 +754,25 @@ class MultipleNegativeEdgeSampler(object):
         original_batch_size = size
         size = 4 * size
 
+        # # Convert float timestamps to datetime objects
+        # current_start_dt = current_batch_start_time[0]
+    
+        # # Compute time range (subtract 20 minutes)
+        # time_20_min_before_dt = current_start_dt - 20
+    
+        # # Get historical edges in the past 20 minutes
+        # historical_edges = self.get_unique_edges_between_start_end_time(
+        #     start_time=time_20_min_before_dt, end_time=current_start_dt
+        # )
         # Convert float timestamps to datetime objects
-        current_start_dt = current_batch_start_time[0]
+        current_start_dt = datetime.strptime(str(int(current_batch_start_time[0])), "%Y%m%d%H%M%S")
     
         # Compute time range (subtract 20 minutes)
-        time_20_min_before_dt = current_start_dt - 20
+        time_20_min_before_dt = float((current_start_dt - timedelta(minutes=20)).strftime("%Y%m%d%H%M%S"))
     
         # Get historical edges in the past 20 minutes
         historical_edges = self.get_unique_edges_between_start_end_time(
-            start_time=time_20_min_before_dt, end_time=current_start_dt
+            start_time=time_20_min_before_dt, end_time=current_batch_start_time[0]
         )
         
         # get historical edges up to current_batch_start_time
