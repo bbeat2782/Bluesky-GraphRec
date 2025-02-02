@@ -87,7 +87,7 @@ class NeighborSampler:
         self.nodes_neighbor_ids = []
         self.nodes_edge_ids = []
         self.nodes_neighbor_times = []
-        #self.nodes_neighbor_idx = []
+        self.nodes_neighbor_idx = []
 
         if self.sample_neighbor_strategy == 'time_interval_aware':
             self.nodes_neighbor_sampled_probabilities = []
@@ -103,7 +103,7 @@ class NeighborSampler:
             self.nodes_neighbor_ids.append(np.array([x[0] for x in sorted_per_node_neighbors]))
             self.nodes_edge_ids.append(np.array([x[1] for x in sorted_per_node_neighbors]))
             self.nodes_neighbor_times.append(np.array([x[2] for x in sorted_per_node_neighbors]))
-            #self.nodes_neighbor_idx.append(np.array([x[3] for x in sorted_per_node_neighbors]))
+            self.nodes_neighbor_idx.append(np.array([x[3] for x in sorted_per_node_neighbors]))
 
             # additional for time interval aware sampling strategy (proposed in CAWN paper)
             if self.sample_neighbor_strategy == 'time_interval_aware':
@@ -145,9 +145,9 @@ class NeighborSampler:
 
         if return_sampled_probabilities:
             return self.nodes_neighbor_ids[node_id][:i], self.nodes_edge_ids[node_id][:i], self.nodes_neighbor_times[node_id][:i], \
-                   self.nodes_neighbor_sampled_probabilities[node_id][:i]
+                   self.nodes_neighbor_sampled_probabilities[node_id][:i], self.nodes_neighbor_idx[node_id][:i]
         else:
-            return self.nodes_neighbor_ids[node_id][:i], self.nodes_edge_ids[node_id][:i], self.nodes_neighbor_times[node_id][:i], None
+            return self.nodes_neighbor_ids[node_id][:i], self.nodes_edge_ids[node_id][:i], self.nodes_neighbor_times[node_id][:i], None, self.nodes_neighbor_idx[node_id][:i]
 
     def get_historical_neighbors(self, node_ids: np.ndarray, node_interact_times: np.ndarray, num_neighbors: int = 20):
         """
@@ -172,7 +172,7 @@ class NeighborSampler:
         # extracts all neighbors ids, edge ids and interaction times of nodes in node_ids, which happened before the corresponding time in node_interact_times
         for idx, (node_id, node_interact_time) in enumerate(zip(node_ids, node_interact_times)):
             # find neighbors that interacted with node_id before time node_interact_time
-            node_neighbor_ids, node_edge_ids, node_neighbor_times, node_neighbor_sampled_probabilities = \
+            node_neighbor_ids, node_edge_ids, node_neighbor_times, node_neighbor_sampled_probabilities, node_neighbor_idx = \
                 self.find_neighbors_before(node_id=node_id, interact_time=node_interact_time, return_sampled_probabilities=self.sample_neighbor_strategy == 'time_interval_aware')
 
             if len(node_neighbor_ids) > 0:
@@ -262,19 +262,19 @@ class NeighborSampler:
         :return:
         """
         # three lists to store the first-hop neighbor ids, edge ids and interaction timestamp information, with batch_size as the list length
-        nodes_neighbor_ids_list, nodes_edge_ids_list, nodes_neighbor_times_list = [], [], []#, []
+        nodes_neighbor_ids_list, nodes_edge_ids_list, nodes_neighbor_times_list, nodes_neighbor_idx_list = [], [], [], []
         # get the temporal neighbors at the first hop
         for idx, (node_id, node_interact_time) in enumerate(zip(node_ids, node_interact_times)):
             # find neighbors that interacted with node_id before time node_interact_time
-            node_neighbor_ids, node_edge_ids, node_neighbor_times, _ = self.find_neighbors_before(node_id=node_id,
+            node_neighbor_ids, node_edge_ids, node_neighbor_times, _, node_neighbor_idx = self.find_neighbors_before(node_id=node_id,
                                                                                                   interact_time=node_interact_time,
                                                                                                   return_sampled_probabilities=False)
             nodes_neighbor_ids_list.append(node_neighbor_ids)
             nodes_edge_ids_list.append(node_edge_ids)
             nodes_neighbor_times_list.append(node_neighbor_times)
-            #node_neighbor_idx_list.append(node_neighbor_idx)
+            nodes_neighbor_idx_list.append(node_neighbor_idx)
 
-        return nodes_neighbor_ids_list, nodes_edge_ids_list, nodes_neighbor_times_list#, node_neighbor_idx_list
+        return nodes_neighbor_ids_list, nodes_edge_ids_list, nodes_neighbor_times_list, nodes_neighbor_idx_list
 
     def reset_random_state(self):
         """
@@ -299,9 +299,9 @@ def get_neighbor_sampler(data: Data, sample_neighbor_strategy: str = 'uniform', 
     # adj_list, list of list, where each element is a list of triple tuple (node_id, edge_id, timestamp)
     # the list at the first position in adj_list is empty
     adj_list = [[] for _ in range(max_node_id + 1)]
-    for src_node_id, dst_node_id, edge_id, node_interact_time in zip(data.src_node_ids, data.dst_node_ids, data.edge_ids, data.node_interact_times):#, data.idx):
-        adj_list[src_node_id].append((dst_node_id, edge_id, node_interact_time))#, idx))
-        adj_list[dst_node_id].append((src_node_id, edge_id, node_interact_time))##, idx))
+    for src_node_id, dst_node_id, edge_id, node_interact_time, interaction_idx in zip(data.src_node_ids, data.dst_node_ids, data.edge_ids, data.node_interact_times, data.idx):
+        adj_list[src_node_id].append((dst_node_id, edge_id, node_interact_time, interaction_idx))
+        adj_list[dst_node_id].append((src_node_id, edge_id, node_interact_time, interaction_idx))
 
     return NeighborSampler(adj_list=adj_list, sample_neighbor_strategy=sample_neighbor_strategy, time_scaling_factor=time_scaling_factor, seed=seed)
 
@@ -327,6 +327,19 @@ class CandidateEdgeSampler(object):
         candidates_dict = {}
         unique_start_times = np.unique(current_batch_start_time)
         for start_time in unique_start_times:
+            # twenty_mins_before = start_time - 20
+
+            # if popularity_based:
+            #     candidates_dict[start_time] = self.sort_by_popularity(
+            #         start_time=twenty_mins_before, 
+            #         end_time=start_time
+            #     )
+            # else:
+            #     # Fetch unique posts for the time range
+            #     candidates_dict[start_time] = self.get_unique_posts_between_start_end_time(
+            #         start_time=twenty_mins_before, 
+            #         end_time=start_time
+            #     )
             # Convert start_time to datetime
             observed_datetime = datetime.strptime(str(int(start_time)), "%Y%m%d%H%M%S")
 
@@ -741,6 +754,16 @@ class MultipleNegativeEdgeSampler(object):
         original_batch_size = size
         size = 4 * size
 
+        # # Convert float timestamps to datetime objects
+        # current_start_dt = current_batch_start_time[0]
+    
+        # # Compute time range (subtract 20 minutes)
+        # time_20_min_before_dt = current_start_dt - 20
+    
+        # # Get historical edges in the past 20 minutes
+        # historical_edges = self.get_unique_edges_between_start_end_time(
+        #     start_time=time_20_min_before_dt, end_time=current_start_dt
+        # )
         # Convert float timestamps to datetime objects
         current_start_dt = datetime.strptime(str(int(current_batch_start_time[0])), "%Y%m%d%H%M%S")
     
