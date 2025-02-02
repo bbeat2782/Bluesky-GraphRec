@@ -24,7 +24,7 @@ if __name__ == "__main__":
     args = get_link_prediction_args(is_evaluation=True)
 
     # get data for training, validation and testing
-    node_raw_features, edge_raw_features, full_data, test_data, eval_test_data = \
+    node_raw_features, _, full_data, test_data, eval_test_data, dynamic_user_features = \
         get_link_prediction_data_eval(dataset_name=args.dataset_name, val_ratio=args.val_ratio, test_ratio=args.test_ratio)
     
     # initialize validation and test neighbor sampler to retrieve temporal graph
@@ -77,10 +77,10 @@ if __name__ == "__main__":
 
         # create model
         if args.model_name == 'GraphRec':
-            dynamic_backbone = GraphRec(node_raw_features=node_raw_features, edge_raw_features=edge_raw_features, neighbor_sampler=full_neighbor_sampler,
+            dynamic_backbone = GraphRec(node_raw_features=node_raw_features, neighbor_sampler=full_neighbor_sampler,
                                             time_feat_dim=args.time_feat_dim, channel_embedding_dim=args.channel_embedding_dim, patch_size=args.patch_size,
                                             num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout,
-                                            max_input_sequence_length=args.max_input_sequence_length, device=args.device)
+                                            max_input_sequence_length=args.max_input_sequence_length, device=args.device, user_dynamic_features=dynamic_user_features, src_max_id=eval_test_data.src_max_id)
         else:
             raise ValueError(f"Wrong value for model_name {args.model_name}!")
         link_predictor = MergeLayer(input_dim1=node_raw_features.shape[1], input_dim2=node_raw_features.shape[1],
