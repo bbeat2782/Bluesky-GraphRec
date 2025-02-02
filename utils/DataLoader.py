@@ -103,10 +103,10 @@ def get_link_prediction_data(dataset_name: str, val_ratio: float, test_ratio: fl
 
     assert NODE_FEAT_DIM == node_raw_features.shape[1] and EDGE_FEAT_DIM == edge_raw_features.shape[1], 'Unaligned feature dimensions after feature padding!'
 
-    node_interact_times = graph_df.ts.values.astype(np.float64)
-    min_timestamp = node_interact_times.min()
-    node_interact_times = (graph_df.ts.values - min_timestamp).astype(np.int32)
-    graph_df.ts = node_interact_times
+    # node_interact_times = graph_df.ts.values.astype(np.float64)
+    # min_timestamp = node_interact_times.min()
+    # node_interact_times = (graph_df.ts.values - min_timestamp).astype(np.int32)
+    # graph_df.ts = node_interact_times
     
     # get the timestamp of validate and test set
     val_time, test_time = list(np.quantile(graph_df.ts, [(1 - val_ratio - test_ratio), (1 - test_ratio)]))
@@ -114,7 +114,8 @@ def get_link_prediction_data(dataset_name: str, val_ratio: float, test_ratio: fl
     src_node_ids = graph_df.u.values.astype(np.int32)
     dst_node_ids = graph_df.i.values.astype(np.int32)
     edge_ids = graph_df.idx.values.astype(np.int32)
-    labels = graph_df.label.values.astype(np.int8) 
+    node_interact_times = graph_df.ts.values.astype(np.float64)  # added
+    labels = graph_df.label.values.astype(np.int8)
     idx = graph_df.idx.values.astype(np.int32)
     src_max_id = np.max(src_node_ids)
     print('src_max_id', src_max_id)
@@ -235,10 +236,10 @@ def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_rati
 
     assert NODE_FEAT_DIM == node_raw_features.shape[1] and EDGE_FEAT_DIM == edge_raw_features.shape[1], 'Unaligned feature dimensions after feature padding!'
 
-    node_interact_times = graph_df.ts.values.astype(np.float64)
-    min_timestamp = node_interact_times.min()
-    node_interact_times = (graph_df.ts.values - min_timestamp).astype(np.int32)
-    graph_df.ts = node_interact_times
+    # node_interact_times = graph_df.ts.values.astype(np.float64)
+    # min_timestamp = node_interact_times.min()
+    # node_interact_times = (graph_df.ts.values - min_timestamp).astype(np.int32)
+    # graph_df.ts = node_interact_times
 
     # get the timestamp of validate and test set
     val_time, test_time = list(np.quantile(graph_df.ts, [(1 - val_ratio - test_ratio), (1 - test_ratio)]))
@@ -249,7 +250,7 @@ def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_rati
 
     src_node_ids = graph_df.u.values.astype(np.longlong)
     dst_node_ids = graph_df.i.values.astype(np.longlong)
-    # node_interact_times = graph_df.ts.values.astype(np.float64)
+    node_interact_times = graph_df.ts.values.astype(np.float64)  # added
     edge_ids = graph_df.idx.values.astype(np.longlong)
     labels = graph_df.label.values
     idx = graph_df.idx.values
@@ -307,7 +308,7 @@ def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_rati
     filtered_idx = idx[val_mask]
 
     
-    length_restrict = int(0.01 * len(filtered_src_node_ids))
+    length_restrict = int(1 * len(filtered_src_node_ids))
 
     interactions_df = pd.DataFrame({
         'src_node_id': filtered_src_node_ids[:length_restrict],
