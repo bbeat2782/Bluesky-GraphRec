@@ -1,1 +1,0 @@
-# own implementation of LightGCN / UltraGCN (Not working yet)

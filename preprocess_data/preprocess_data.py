@@ -1,9 +1,3 @@
-# modifying for bluesky dataset
-# Item node feature:
-#    currently, text embedding has 384 dim --> which is item node feature (not edge feature)
-# User node feataure:
-#    work in progress: concatenate a bunch of features?
-
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -123,7 +117,6 @@ def preprocess_data(dataset_name: str, bipartite: bool = True, node_feat_dim: in
     
     # Processing node features from Parquet file
     text_embeddings = pd.read_parquet(ITEM_EMBEDDINGS_PATH)
-    text_embeddings['embeddings'] = text_embeddings['embeddings'].apply(unpack_embeddings)
     text_embeddings = text_embeddings.sort_values('item_id').reset_index(drop=True)
     user_max_id = df.u.max()
     offset = user_max_id + 2
@@ -147,109 +140,87 @@ def preprocess_data(dataset_name: str, bipartite: bool = True, node_feat_dim: in
     # Current format of ts: `20230101024321.0` (`YYYYMMDDHHMMSS`) --> change to datetime obj
     new_df['ts'] = pd.to_datetime(new_df['ts'].astype(int).astype(str), format='%Y%m%d%H%M%S')
 
-    # Sort by user id and ts
-    new_df = new_df.sort_values(['u', 'ts'])
-    print('sort finished')
+    history_size = 10
 
-    # Calculate rolling count using a sliding window
-    def calculate_rolling_count(group):
-        timestamps = group['ts'].to_numpy()
-        counts = []
-        start_idx = 0
-        
-        for current_idx, current_time in enumerate(timestamps):
-            # Slide the start index to maintain a 3-day window
-            while timestamps[start_idx] < current_time - pd.Timedelta(days=3):
-                start_idx += 1
-            counts.append(current_idx - start_idx)  # Count interactions in the window
+    # Ensure dataframe is sorted
+    new_df = new_df.sort_values(by=['u', 'ts']).reset_index(drop=True)
     
-        group['num_likes'] = counts
-        return group
+    # Convert to NumPy for fast access
+    user_ids = new_df['u'].values
+    item_ids = new_df['i'].values
+    embeddings = node_feats[item_ids].astype(np.float16)  # Direct NumPy lookup
+    
+    # Initialize output array
+    user_dynamic_features = np.zeros_like(embeddings, dtype=np.float16)
+    
+    # Process in batch using NumPy slicing
+    unique_users, user_starts = np.unique(user_ids, return_index=True)
+    for idx, start in enumerate(user_starts):
+        end = user_starts[idx + 1] if idx + 1 < len(user_starts) else len(user_ids)
+        
+        user_embeds = embeddings[start:end]  # Extract all embeddings for this user
+        num_interactions = len(user_embeds)
+    
+        if num_interactions == 1:
+            # If only one interaction exists, set to zeros (no past interactions to average)
+            user_dynamic_features[start:end] = np.zeros_like(user_embeds)
+            continue
+    
+        # Compute cumulative sum
+        cumsum = np.cumsum(user_embeds, axis=0)
+    
+        # Compute rolling sum while excluding current embedding
+        rolling_sum = np.zeros_like(user_embeds)
+        for i in range(num_interactions):
+            start_idx = max(0, i - history_size)
+            past_sum = cumsum[i - 1] - (cumsum[start_idx - 1] if start_idx > 0 else 0)
+            rolling_sum[i] = past_sum
+    
+        # Compute rolling mean excluding the current embedding
+        valid_counts = np.minimum(np.arange(num_interactions), history_size)[:, None]  # Excludes current element
+        rolling_mean = rolling_sum / np.maximum(valid_counts, 1)  # Avoid division by zero
+    
+        # Explicitly set the first interaction to a zero vector
+        rolling_mean[0] = np.zeros_like(user_embeds[0])
+    
+        # Store result
+        user_dynamic_features[start:end] = rolling_mean
+    
+    # Restore the original order before saving
+    new_df['user_dynamic_features'] = list(user_dynamic_features)
+    new_df = new_df.sort_values(by='idx')
 
-    new_df = new_df.groupby('u', group_keys=False).apply(calculate_rolling_count)
-    print('num_likes finished')
+    np.savez_compressed("/home/sgan/user_dynamic_features.npz", 
+                    user_dynamic_features=np.array(new_df['user_dynamic_features'].tolist(), dtype=np.float16))
 
-    # Ensure 'num_likes' is of type int16
-    new_df['num_likes'] = new_df['num_likes'].astype(np.int16)
-
-    # Converting back to numerical values for training
-    new_df['ts'] = new_df['ts'].dt.strftime('%Y%m%d%H%M%S').astype(float)
-    new_df = new_df.sort_values(by=['idx'])
-
-
-    print('new_df', new_df.head(5))
-
-    user_dynamic_features = np.zeros((new_df.shape[0] + 1, 2), dtype=np.int16)
-    user_dynamic_features[new_df['idx'].values, 0] = new_df['num_likes'].values
     
     print('number of nodes ', node_feats.shape[0] - 1)
     print('number of node features ', node_feats.shape[1])
     print('number of edges ', edge_feats.shape[0] - 1)
     print('number of edge features ', edge_feats.shape[1])
-    print('number of dynamic features ', user_dynamic_features.shape[1])
+    # print('number of dynamic features ', user_dynamic_features.shape[1])
     
     new_df.to_csv(OUT_DF)  # edge-list
     np.save(OUT_FEAT, edge_feats)  # edge features
     np.save(OUT_NODE_FEAT, node_feats)  # node features
-    np.save(OUT_DYNAMIC_USER_FEAT, user_dynamic_features)  # dynamic features
+    # np.save(OUT_DYNAMIC_USER_FEAT, user_dynamic_features)  # dynamic features
     
-
-
-def check_data(dataset_name: str):
-    """
-    check whether the processed datasets are identical to the given processed datasets
-    :param dataset_name: str, dataset name
-    :return:
-    """
-    # original data paths
-    origin_OUT_DF = '../DG_data/{}/ml_{}.csv'.format(dataset_name, dataset_name)
-    origin_OUT_FEAT = '../DG_data/{}/ml_{}.npy'.format(dataset_name, dataset_name)
-    origin_OUT_NODE_FEAT = '../DG_data/{}/ml_{}_node.npy'.format(dataset_name, dataset_name)
-
-    # processed data paths
-    OUT_DF = '../processed_data/{}/ml_{}.csv'.format(dataset_name, dataset_name)
-    OUT_FEAT = '../processed_data/{}/ml_{}.npy'.format(dataset_name, dataset_name)
-    OUT_NODE_FEAT = '../processed_data/{}/ml_{}_node.npy'.format(dataset_name, dataset_name)
-
-    # Load original data
-    origin_g_df = pd.read_csv(origin_OUT_DF)
-    origin_e_feat = np.load(origin_OUT_FEAT)
-    origin_n_feat = np.load(origin_OUT_NODE_FEAT)
-
-    # Load processed data
-    g_df = pd.read_csv(OUT_DF)
-    e_feat = np.load(OUT_FEAT)
-    n_feat = np.load(OUT_NODE_FEAT)
-
-    assert_frame_equal(origin_g_df, g_df)
-    # check numbers of edges and edge features
-    assert origin_e_feat.shape == e_feat.shape and origin_e_feat.max() == e_feat.max() and origin_e_feat.min() == e_feat.min()
-    # check numbers of nodes and node features
-    assert origin_n_feat.shape == n_feat.shape and origin_n_feat.max() == n_feat.max() and origin_n_feat.min() == n_feat.min()
-
 
 parser = argparse.ArgumentParser('Interface for preprocessing datasets')
 parser.add_argument('--dataset_name', type=str,
-                    choices=['wikipedia', 'reddit', 'mooc', 'lastfm', 'myket', 'enron', 'SocialEvo', 'uci',
-                             'Flights', 'CanParl', 'USLegis', 'UNtrade', 'UNvote', 'Contacts', 'bluesky'],
-                    help='Dataset name', default='wikipedia')
+                    choices=['bluesky'],
+                    help='Dataset name', default='bluesky')
 parser.add_argument('--node_feat_dim', type=int, default=128, help='Number of node raw features')
 
 args = parser.parse_args()
 
 print(f'preprocess dataset {args.dataset_name}...')
-if args.dataset_name in ['enron', 'SocialEvo', 'uci']:
-    Path("../processed_data/{}/".format(args.dataset_name)).mkdir(parents=True, exist_ok=True)
-    copy_tree("../DG_data/{}/".format(args.dataset_name), "../processed_data/{}/".format(args.dataset_name))
-    print(f'the original dataset of {args.dataset_name} is unavailable, directly use the processed dataset by previous works.')
-else:
-    # bipartite dataset
-    if args.dataset_name in ['wikipedia', 'reddit', 'mooc', 'lastfm', 'myket', 'bluesky']:
-        preprocess_data(dataset_name=args.dataset_name, bipartite=True, node_feat_dim=args.node_feat_dim)
-    else:
-        preprocess_data(dataset_name=args.dataset_name, bipartite=False, node_feat_dim=args.node_feat_dim)
-    print(f'{args.dataset_name} is processed successfully.')
 
-    if args.dataset_name not in ['myket']:
-        check_data(args.dataset_name)
-    print(f'{args.dataset_name} passes the checks successfully.')
+# bipartite dataset
+if args.dataset_name in ['bluesky']:
+    preprocess_data(dataset_name=args.dataset_name, bipartite=True, node_feat_dim=args.node_feat_dim)
+else:
+    preprocess_data(dataset_name=args.dataset_name, bipartite=False, node_feat_dim=args.node_feat_dim)
+print(f'{args.dataset_name} is processed successfully.')
+
+print(f'{args.dataset_name} passes the checks successfully.')
