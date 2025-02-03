@@ -20,6 +20,9 @@ if __name__ == "__main__":
 
     warnings.filterwarnings('ignore')
 
+    # Suppress Matplotlib debug messages once at the beginning
+    logging.getLogger('matplotlib').setLevel(logging.WARNING)
+
     # get arguments
     args = get_link_prediction_args(is_evaluation=True)
 
@@ -48,7 +51,7 @@ if __name__ == "__main__":
 
         set_random_seed(seed=run)
 
-        args.seed = run
+        # args.seed = run
         args.load_model_name = f'{args.model_name}_seed{args.seed}'
         args.save_result_name = f'{args.negative_sample_strategy}_negative_sampling_{args.model_name}_seed{args.seed}'
 

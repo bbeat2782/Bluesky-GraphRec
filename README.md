@@ -6,25 +6,6 @@ This repository is built for the project **Bluesky: Post Recommendation**, prima
 
 TODO
 
-## Preprocessing
-
-The Myket dataset comes from [Effect of Choosing Loss Function when Using T-batching for Representation Learning on Dynamic Networks](https://arxiv.org/abs/2308.06862) and 
-can be accessed from [here](https://github.com/erfanloghmani/myket-android-application-market-dataset). 
-The original and preprocessed files for Myket dataset are included in this repository.
-
-We can run ```preprocess_data/preprocess_data.py``` for pre-processing the datasets.
-For example, to preprocess the *Bluesky* dataset, we can run the following commands:
-```{bash}
-cd preprocess_data/
-python preprocess_data.py  --dataset_name bluesky
-```
-
-## Evaluation Tasks
-
-DyGLib supports dynamic link prediction under both transductive and inductive settings with three (i.e., random, historical, and inductive) negative sampling strategies,
-as well as dynamic node classification.
-
-
 ## Environments
 Follow these steps to set up the `bluesky` environment:
 
@@ -44,19 +25,26 @@ Some packages, such as torch-geometric, are installed via pip. So to ensure all 
 pip install -r requirements.txt
 ```
 
-## Executing Scripts
+## Preprocessing
+
+We can run ```preprocess_data/preprocess_data.py``` for pre-processing the datasets.
+To preprocess the *Bluesky* dataset, we can run the following commands:
+```{bash}
+cd preprocess_data/
+python preprocess_data.py  --dataset_name bluesky
+```
+
+## Evaluation Tasks
 
 ### Scripts for Dynamic Link Prediction
-Dynamic link prediction could be performed on all the thirteen datasets. 
-If you want to load the best model configurations determined by the grid search, please set the *load_best_configs* argument to True.
+
 #### Model Training
-* Example of training *GraphRec* on *Bluesky* dataset:
+* Training *GraphRec* on *Bluesky* dataset:
 ```{bash}
-python train_link_prediction.py --dataset_name bluesky --model_name GraphRec --patch_size 2 --max_input_sequence_length 64 --num_runs 5 --gpu 0 --batch_size 500 --negative_sample_strategy historical
+python train_link_prediction.py --dataset_name bluesky --model_name GraphRec --patch_size 2 --max_input_sequence_length 64 --num_runs 1 --gpu 0 --batch_size 500 --negative_sample_strategy historical --num_epochs 30
 ```
 #### Model Evaluation
-Three (i.e., random, historical, and inductive) negative sampling strategies can be used for model evaluation.
-* Example of evaluating *GraphRec* with posts that received at least one like in the last 20 minutes as candidate generation on *Bluesky* dataset:
+* Evaluating *GraphRec* with posts that received at least one like in the last 20 minutes as candidate generation on *Bluesky* dataset:
 ```{bash}
 python evaluate_link_prediction_v2.py --dataset_name bluesky --model_name GraphRec --patch_size 2 --max_input_sequence_length 64 --negative_sample_strategy real --num_runs 1 --gpu 0 --batch_size 4
 ```
@@ -71,7 +59,6 @@ We are grateful to the authors of
 [EdgeBank](https://github.com/fpour/DGB),
 [GraphMixer](https://github.com/CongWeilin/GraphMixer), and
 [DyGFormer](https://github.com/yule-BUAA/DyGLib) for making their project codes publicly available.
-
 
 ## Citation
 

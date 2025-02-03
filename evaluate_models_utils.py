@@ -8,6 +8,7 @@ import time
 import argparse
 import os
 import json
+import matplotlib.pyplot as plt
 
 from utils.metrics import get_link_prediction_metrics
 from utils.utils import set_random_seed
@@ -144,16 +145,31 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                         # True destination not found in candidates
                         mrr_results.append(0)
 
-    np.save("mrr_results.npy", np.array(mrr_results))
+    np.save("saved_results/GraphRec/bluesky/mrr_results.npy", np.array(mrr_results))
     avg_mrr = sum(mrr_results) / len(mrr_results)
     
     print(f"Mean Reciprocal Rank (MRR): {avg_mrr}")
 
     # Save the candidates_length dictionary to a JSON file
-    output_dict_path = "candidates_length.json"
-    
+    output_dict_path = "saved_results/GraphRec/bluesky/candidates_length.json"
     with open(output_dict_path, 'w') as f:
        json.dump(candidates_length, f, indent=4)
+
+    # Convert the dictionary values into a flat list of counts
+    all_counts = list(candidates_length.values())
+    
+    # Plot histogram
+    plt.figure(figsize=(10, 6))
+    plt.hist(all_counts, bins='auto', edgecolor='black')
+    plt.title("Distribution of Candidate Counts")
+    plt.xlabel("Number of Candidates")
+    plt.ylabel("Frequency")
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    
+    # Save the plot
+    output_path = "saved_results/GraphRec/bluesky/candidates_length_histogram.png"
+    plt.savefig(output_path)
+    plt.close()
 
     return avg_mrr
 
@@ -184,9 +200,9 @@ def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_s
 
     model.eval()
 
-    subset_fraction = 0.1  # Eval on 10% of the data
+    subset_fraction = 0.3  # Eval on 30% of the data
     num_batches = len(evaluate_idx_data_loader)
-    start_batch = int(num_batches * (1 - subset_fraction))  # Compute start index for last 10%
+    start_batch = int(num_batches * (1 - subset_fraction))  # Compute start index for last 30%
 
     with torch.no_grad():
         # store evaluate losses and metrics
@@ -194,7 +210,7 @@ def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_s
         evaluate_idx_data_loader_tqdm = tqdm(evaluate_idx_data_loader, ncols=120)
         for batch_idx, evaluate_data_indices in enumerate(evaluate_idx_data_loader_tqdm):
             if batch_idx < start_batch:
-                continue  # Skip first 90% of batches
+                continue  # Skip first 70% of batches
             
             evaluate_data_indices = evaluate_data_indices.numpy()
             # print('evaluate_data_indices', evaluate_data_indices)
