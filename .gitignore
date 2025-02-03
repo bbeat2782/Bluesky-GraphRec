@@ -141,3 +141,7 @@ notebook.ipynb
 candidates_length.json
 candidates_length_histogram.png
 
+random_tests
+lightgcn
+*.ipynb
+

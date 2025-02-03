@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
 
 from utils.DataLoader import Data
 
@@ -20,6 +21,26 @@ def set_random_seed(seed: int = 0):
         torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+
+def save_plot(data, labels, title, ylabel, filename):
+    plt.figure(figsize=(8, 5))
+    for i, series in enumerate(data):
+        plt.plot(series, label=labels[i], marker="o")
+    
+    plt.xlabel("Epochs")
+    plt.ylabel(ylabel)
+    plt.legend()
+    plt.title(title)
+
+    # Set grid to light gray
+    plt.grid(color='lightgray', linestyle='--', linewidth=0.5)
+
+    # Ensure x-axis labels are integers (epochs)
+    plt.xticks(range(len(data[0])))
+
+    plt.savefig(filename)
+    plt.close()
 
 
 def convert_to_gpu(*data, device: str):

@@ -13,7 +13,7 @@ from torch.amp import autocast
 
 from models.GraphRec import GraphRec
 from models.modules import MergeLayer
-from utils.utils import set_random_seed, convert_to_gpu, get_parameter_sizes, create_optimizer
+from utils.utils import set_random_seed, convert_to_gpu, get_parameter_sizes, create_optimizer, save_plot
 from utils.utils import get_neighbor_sampler, NegativeEdgeSampler, MultipleNegativeEdgeSampler
 from evaluate_models_utils import evaluate_model_link_prediction
 from utils.metrics import get_link_prediction_metrics
@@ -24,6 +24,9 @@ from utils.load_configs import get_link_prediction_args
 if __name__ == "__main__":
 
     warnings.filterwarnings('ignore')
+
+    # Suppress Matplotlib debug messages once at the beginning
+    logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
     # get arguments
     args = get_link_prediction_args(is_evaluation=False)
@@ -60,7 +63,7 @@ if __name__ == "__main__":
 
         set_random_seed(seed=run)
 
-        args.seed = run
+        # args.seed = run
         args.save_model_name = f'{args.model_name}_seed{args.seed}'
 
         # set up logger
@@ -115,9 +118,13 @@ if __name__ == "__main__":
 
         loss_func = nn.BCELoss()
 
-        subset_fraction = 0.1  # Train on 10% of the data
+        subset_fraction = 0.3  # Train on 30% of the data
         num_batches = len(train_idx_data_loader)
-        start_batch = int(num_batches * (1 - subset_fraction))  # Compute start index for last 10%
+        start_batch = int(num_batches * (1 - subset_fraction))  # Compute start index for last 30%
+
+        train_loss_history, val_loss_history, new_val_loss_history = [], [], []
+        train_acc_history, val_acc_history, new_val_acc_history = [], [], []
+        train_pairwise_acc_history, val_pairwise_acc_history, new_val_pairwise_acc_history = [], [], []
 
         for epoch in range(args.num_epochs):
 
@@ -131,7 +138,7 @@ if __name__ == "__main__":
             train_idx_data_loader_tqdm = tqdm(train_idx_data_loader, ncols=120)
             for batch_idx, train_data_indices in enumerate(train_idx_data_loader_tqdm):
                 if batch_idx < start_batch:
-                    continue  # Skip first 90% of batches
+                    continue  # Skip first 70% of batches
                 
                 train_data_indices = train_data_indices.numpy()
                 batch_src_node_ids, batch_dst_node_ids, batch_node_interact_times, batch_edge_ids = \
@@ -207,19 +214,6 @@ if __name__ == "__main__":
                 optimizer.zero_grad()
                 bpr_loss.backward()
                 optimizer.step()    
-                
-                # predicts = torch.cat([positive_probabilities, negative_probabilities], dim=0)
-                # labels = torch.cat([torch.ones_like(positive_probabilities), torch.zeros_like(negative_probabilities)], dim=0)
-
-                # loss = loss_func(input=predicts, target=labels)
-
-                # train_losses.append(loss.item())
-
-                # train_metrics.append(get_link_prediction_metrics(predicts=predicts, labels=labels))
-
-                # optimizer.zero_grad()
-                # loss.backward()
-                # optimizer.step()
 
                 train_idx_data_loader_tqdm.set_description(f'Epoch: {epoch + 1}, train for the {batch_idx + 1}-th batch, train loss: {bpr_loss.item()}')
 
@@ -242,6 +236,16 @@ if __name__ == "__main__":
                                                                                        loss_func=loss_func,
                                                                                        num_neighbors=args.num_neighbors,
                                                                                        time_gap=args.time_gap)
+            # Saving training results
+            train_loss_history.append(np.mean(train_losses))
+            val_loss_history.append(np.mean(val_losses))
+            new_val_loss_history.append(np.mean(new_node_val_losses))
+            train_acc_history.append(np.mean([train_metric['accuracy'] for train_metric in train_metrics]))
+            val_acc_history.append(np.mean([val_metric['accuracy'] for val_metric in val_metrics]))
+            new_val_acc_history.append(np.mean([new_node_val_metric['accuracy'] for new_node_val_metric in new_node_val_metrics]))
+            train_pairwise_acc_history.append(np.mean([train_metric['pairwise_acc'] for train_metric in train_metrics]))
+            val_pairwise_acc_history.append(np.mean([val_metric['pairwise_acc'] for val_metric in val_metrics]))
+            new_val_pairwise_acc_history.append(np.mean([new_node_val_metric['pairwise_acc'] for new_node_val_metric in new_node_val_metrics]))
 
             logger.info(f'Epoch: {epoch + 1}, learning rate: {optimizer.param_groups[0]["lr"]}, train loss: {np.mean(train_losses):.4f}')
             for metric_name in train_metrics[0].keys():
@@ -377,6 +381,47 @@ if __name__ == "__main__":
             logger.removeHandler(fh)
             logger.removeHandler(ch)
 
+        # Save data as JSON
+        training_results = {
+            "train_loss_history": train_loss_history,
+            "val_loss_history": val_loss_history,
+            "new_val_loss_history": new_val_loss_history,
+            "train_acc_history": train_acc_history,
+            "val_acc_history": val_acc_history,
+            "new_val_acc_history": new_val_acc_history,
+            "train_pairwise_acc_history": train_pairwise_acc_history,
+            "val_pairwise_acc_history": val_pairwise_acc_history,
+            "new_val_pairwise_acc_history": new_val_pairwise_acc_history,
+        }
+        
+        with open("saved_results/GraphRec/bluesky/training_results.json", "w") as f:
+            json.dump(training_results, f, indent=4)
+
+        # Save plots using the function
+        save_plot(
+            [train_loss_history, val_loss_history, new_val_loss_history],
+            ["Train Loss", "Validation Loss", "New Node Validation Loss"],
+            "Training and Validation Loss",
+            "Loss",
+            "saved_results/GraphRec/bluesky/training_loss_plot.png",
+        )
+        
+        save_plot(
+            [train_acc_history, val_acc_history, new_val_acc_history],
+            ["Train Accuracy", "Validation Accuracy", "New Node Validation Accuracy"],
+            "Training and Validation Accuracy",
+            "Accuracy",
+            "saved_results/GraphRec/bluesky/training_accuracy_plot.png",
+        )
+        
+        save_plot(
+            [train_pairwise_acc_history, val_pairwise_acc_history, new_val_pairwise_acc_history],
+            ["Train Pairwise Accuracy", "Validation Pairwise Accuracy", "New Node Validation Pairwise Accuracy"],
+            "Training and Validation Pairwise Accuracy",
+            "Pairwise Accuracy",
+            "saved_results/GraphRec/bluesky/training_pairwise_accuracy_plot.png",
+        )
+
         # save model result
         result_json = {
             "validate metrics": {metric_name: f'{val_metric_dict[metric_name]:.4f}' for metric_name in val_metric_dict},
@@ -392,6 +437,7 @@ if __name__ == "__main__":
 
         with open(save_result_path, 'w') as file:
             file.write(result_json)
+        
 
     # store the average metrics at the log of the last run
     logger.info(f'metrics over {args.num_runs} runs:')
