@@ -1,3 +1,4 @@
+```
 --------------------------------------------
              DATA COLLECTION
 --------------------------------------------
@@ -55,6 +56,7 @@
        v
     Evaluation Results
 --------------------------------------------
+```
 
 Notes:
 - Producer affinity is leftover from previous work. We don't use it in the current implementation. You can safely ignore it.
@@ -67,7 +69,7 @@ Offline evaluation limitations vs. Real-World realtime deployment:
 3. User embeddings when recomputed nightly/hourly may have latent space change/drift. 
 
 TODO:
-- [*] Persistent post mappings
+- [x] Persistent post mappings
 - [ ] GPU-accelerated FAISS index
 - [ ] Persistent, deterministic consumer embeddings latent space
 
