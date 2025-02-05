@@ -27,6 +27,11 @@ pip install -r requirements.txt
 
 ## Preprocessing
 
+```{bash}
+cd preprocess_data/
+python extract_from_duckdb.py
+```
+
 We can run ```preprocess_data/preprocess_data.py``` for pre-processing the datasets.
 To preprocess the *Bluesky* dataset, we can run the following commands:
 ```{bash}
@@ -41,7 +46,7 @@ python preprocess_data.py  --dataset_name bluesky
 #### Model Training
 * Training *GraphRec* on *Bluesky* dataset:
 ```{bash}
-python train_link_prediction.py --dataset_name bluesky --model_name GraphRec --patch_size 2 --max_input_sequence_length 64 --num_runs 1 --gpu 0 --batch_size 500 --negative_sample_strategy historical --num_epochs 30
+python train_link_prediction.py --dataset_name bluesky --model_name GraphRec --patch_size 2 --max_input_sequence_length 64 --num_runs 1 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 30
 ```
 #### Model Evaluation
 * Evaluating *GraphRec* with posts that received at least one like in the last 20 minutes as candidate generation on *Bluesky* dataset:
