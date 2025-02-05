@@ -38,6 +38,7 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
     model[0].set_neighbor_sampler(neighbor_sampler)
     model.eval()
     candidates_length = {}
+    recommended_posts = {}
 
     with torch.no_grad():
         # store evaluate losses and metrics
@@ -145,6 +146,49 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                         # True destination not found in candidates
                         mrr_results.append(0)
 
+
+                    # NOTE: For checking which posts are recommended. Comment this when you do not need it
+                    # Sort indices based on probabilities in descending order
+                    sorted_indices = np.argsort(-post_probabilities)  # Negative sign for descending order
+                
+                    # Apply sorted indices to both arrays
+                    sorted_probabilities = post_probabilities[sorted_indices]
+                    sorted_candidates = post_candidates[sorted_indices]
+
+                    # Find index of true_dst_id in sorted candidates
+                    true_dst_index = np.where(sorted_candidates == true_dst_id)[0]
+                
+                    if len(true_dst_index) > 0:
+                        true_dst_index = true_dst_index[0]  # Extract integer index
+                    else:
+                        true_dst_index = None  # Handle case where true_dst_id is missing
+                
+                    # Save top posts up to true_dst_id (if found)
+                    if true_dst_index is not None:
+                        top_candidates = sorted_candidates[:true_dst_index + 1]  # Includes true_dst_id
+                    else:
+                        top_candidates = np.array([])  # Empty if true_dst_id is missing
+                
+                    # Save last 20 or 30 posts
+                    last_candidates = sorted_candidates[-30:]
+                
+                    # Store results in dictionary
+                    recommended_posts[str(true_dst_id)] = {
+                        "top_candidates": top_candidates.tolist(),
+                        "last_candidates": last_candidates.tolist()
+                    }
+
+    # NOTE: For checking which posts are recommended. Comment this when you do not need it
+    # Create directory if it doesn't exist
+    save_dir = "saved_results/GraphRec/bluesky"
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # Save to JSON file
+    save_path = os.path.join(save_dir, "recommended_posts.json")
+    with open(save_path, "w") as json_file:
+        json.dump(recommended_posts, json_file, indent=4)
+    #################################################################################
+    
     np.save("saved_results/GraphRec/bluesky/mrr_results.npy", np.array(mrr_results))
     avg_mrr = sum(mrr_results) / len(mrr_results)
     
@@ -200,7 +244,7 @@ def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_s
 
     model.eval()
 
-    subset_fraction = 0.3  # Eval on 30% of the data
+    subset_fraction = 0.1  # Eval on 30% of the data
     num_batches = len(evaluate_idx_data_loader)
     start_batch = int(num_batches * (1 - subset_fraction))  # Compute start index for last 30%
 

@@ -80,14 +80,16 @@ def get_link_prediction_data(dataset_name: str, val_ratio: float, test_ratio: fl
     graph_df = pd.read_csv('./processed_data/{}/ml_{}.csv'.format(dataset_name, dataset_name))
     edge_raw_features = np.load('./processed_data/{}/ml_{}.npy'.format(dataset_name, dataset_name))
     node_raw_features = np.load('./processed_data/{}/ml_{}_node.npy'.format(dataset_name, dataset_name))
-    dynamic_user_features_path = '/home/sgan/user_dynamic_features.npz'
-    dynamic_user_features_npz = np.load(dynamic_user_features_path, allow_pickle=True)  # Allow lists inside NPZ
-
-    # Extract the correct key
-    dynamic_user_features_list = dynamic_user_features_npz['user_dynamic_features']  # This is a list
-    
-    # Convert to NumPy array before changing dtype
-    dynamic_user_features = np.array(dynamic_user_features_list, dtype=np.float16)
+    # dynamic_user_features_path = '/home/sgan/user_dynamic_features.npz'
+    # dynamic_user_features_npz = np.load(dynamic_user_features_path, allow_pickle=True)  # Allow lists inside NPZ
+    # # Extract the correct key
+    # dynamic_user_features_list = dynamic_user_features_npz['user_dynamic_features']  # This is a list
+    # # Convert to NumPy array before changing dtype
+    # dynamic_user_features = np.array(dynamic_user_features_list, dtype=np.float16)
+    # TODO change this
+    dynamic_user_features_path = '/home/sgan/private/DyGLib/DG_data/bluesky/user_dynamic_features.pkl'
+    with open(dynamic_user_features_path, "rb") as file:
+        dynamic_user_features = pickle.load(file)
 
     NODE_FEAT_DIM = EDGE_FEAT_DIM = 128
 
@@ -102,11 +104,6 @@ def get_link_prediction_data(dataset_name: str, val_ratio: float, test_ratio: fl
         edge_raw_features = np.concatenate([edge_raw_features, edge_zero_padding], axis=1)
 
     assert NODE_FEAT_DIM == node_raw_features.shape[1] and EDGE_FEAT_DIM == edge_raw_features.shape[1], 'Unaligned feature dimensions after feature padding!'
-
-    # node_interact_times = graph_df.ts.values.astype(np.float64)
-    # min_timestamp = node_interact_times.min()
-    # node_interact_times = (graph_df.ts.values - min_timestamp).astype(np.int32)
-    # graph_df.ts = node_interact_times
     
     # get the timestamp of validate and test set
     val_time, test_time = list(np.quantile(graph_df.ts, [(1 - val_ratio - test_ratio), (1 - test_ratio)]))
@@ -213,14 +210,10 @@ def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_rati
     graph_df = pd.read_csv('./processed_data/{}/ml_{}.csv'.format(dataset_name, dataset_name))
     edge_raw_features = np.load('./processed_data/{}/ml_{}.npy'.format(dataset_name, dataset_name))
     node_raw_features = np.load('./processed_data/{}/ml_{}_node.npy'.format(dataset_name, dataset_name))
-    dynamic_user_features_path = '/home/sgan/user_dynamic_features.npz'
-    dynamic_user_features_npz = np.load(dynamic_user_features_path, allow_pickle=True)  # Allow lists inside NPZ
+    dynamic_user_features_path = '/home/sgan/private/DyGLib/DG_data/bluesky/user_dynamic_features.pkl'
+    with open(dynamic_user_features_path, "rb") as file:
+        dynamic_user_features = pickle.load(file)
 
-    # Extract the correct key
-    dynamic_user_features_list = dynamic_user_features_npz['user_dynamic_features']  # This is a list
-    
-    # Convert to NumPy array before changing dtype
-    dynamic_user_features = np.array(dynamic_user_features_list, dtype=np.float16)
 
     NODE_FEAT_DIM = EDGE_FEAT_DIM = 128
 
@@ -235,11 +228,6 @@ def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_rati
         edge_raw_features = np.concatenate([edge_raw_features, edge_zero_padding], axis=1)
 
     assert NODE_FEAT_DIM == node_raw_features.shape[1] and EDGE_FEAT_DIM == edge_raw_features.shape[1], 'Unaligned feature dimensions after feature padding!'
-
-    # node_interact_times = graph_df.ts.values.astype(np.float64)
-    # min_timestamp = node_interact_times.min()
-    # node_interact_times = (graph_df.ts.values - min_timestamp).astype(np.int32)
-    # graph_df.ts = node_interact_times
 
     # get the timestamp of validate and test set
     val_time, test_time = list(np.quantile(graph_df.ts, [(1 - val_ratio - test_ratio), (1 - test_ratio)]))
@@ -308,7 +296,7 @@ def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_rati
     filtered_idx = idx[val_mask]
 
     
-    length_restrict = int(1 * len(filtered_src_node_ids))
+    length_restrict = int(0.1 * len(filtered_src_node_ids))
 
     interactions_df = pd.DataFrame({
         'src_node_id': filtered_src_node_ids[:length_restrict],

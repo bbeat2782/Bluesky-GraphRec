@@ -118,7 +118,7 @@ if __name__ == "__main__":
 
         loss_func = nn.BCELoss()
 
-        subset_fraction = 0.3  # Train on 30% of the data
+        subset_fraction = 0.1  # Train on 30% of the data
         num_batches = len(train_idx_data_loader)
         start_batch = int(num_batches * (1 - subset_fraction))  # Compute start index for last 30%
 
@@ -246,6 +246,22 @@ if __name__ == "__main__":
             train_pairwise_acc_history.append(np.mean([train_metric['pairwise_acc'] for train_metric in train_metrics]))
             val_pairwise_acc_history.append(np.mean([val_metric['pairwise_acc'] for val_metric in val_metrics]))
             new_val_pairwise_acc_history.append(np.mean([new_node_val_metric['pairwise_acc'] for new_node_val_metric in new_node_val_metrics]))
+
+            # Save data as JSON
+            training_results = {
+                "train_loss_history": train_loss_history,
+                "val_loss_history": val_loss_history,
+                "new_val_loss_history": new_val_loss_history,
+                "train_acc_history": train_acc_history,
+                "val_acc_history": val_acc_history,
+                "new_val_acc_history": new_val_acc_history,
+                "train_pairwise_acc_history": train_pairwise_acc_history,
+                "val_pairwise_acc_history": val_pairwise_acc_history,
+                "new_val_pairwise_acc_history": new_val_pairwise_acc_history,
+            }
+            
+            with open("saved_results/GraphRec/bluesky/training_results.json", "w") as f:
+                json.dump(training_results, f, indent=4)
 
             logger.info(f'Epoch: {epoch + 1}, learning rate: {optimizer.param_groups[0]["lr"]}, train loss: {np.mean(train_losses):.4f}')
             for metric_name in train_metrics[0].keys():
