@@ -72,4 +72,6 @@ TODO:
 - [x] Persistent post mappings
 - [ ] GPU-accelerated FAISS index
 - [ ] Persistent, deterministic consumer embeddings latent space
+- [ ] Implement post embeddings for real-time
+- [ ] like interactions -> post embeddings to 2nd model
 
