@@ -53,8 +53,12 @@ df = df.rename(columns={
     'createdAt': 'timestamp'})
 df['edge_label'] = 0
 df = df[['source_node', 'destination_node', 'timestamp', 'edge_label']]
-df['timestamp'] = pd.to_datetime(df['timestamp']).dt.strftime('%Y%m%d%H%M%S')
+
+# Convert timestamp column to datetime
+df['timestamp'] = pd.to_datetime(df['timestamp'])
 df = df.sort_values(by='timestamp')
+# Unix timestamp
+df['timestamp'] = df['timestamp'].astype('int64') // 10**6
 
 df.to_csv('/home/sgan/private/DyGLib/DG_data/bluesky/bluesky.csv', index=False)
 with open('/home/sgan/private/DyGLib/DG_data/bluesky/post_mapping.pkl', 'wb') as f:
@@ -98,6 +102,7 @@ for i in tqdm(range(0, len(texts), batch_size)):
 # Store post embeddings
 post_df = post_df.drop(columns=['text'])
 post_df['embeddings'] = all_embeddings
+print(post_df.columns)
 parquet_file_path = "/home/sgan/private/DyGLib/DG_data/bluesky/bluesky_text_embeddings.parquet"
 #post_df.to_parquet(parquet_file_path, index=False, compression='zstd')
 post_df.to_parquet(parquet_file_path, index=False, compression='zstd', engine='pyarrow')
