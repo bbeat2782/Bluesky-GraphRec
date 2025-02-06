@@ -29,7 +29,36 @@ class GraphRec(nn.Module):
         super(GraphRec, self).__init__()
 
         self.node_raw_features = torch.from_numpy(node_raw_features.astype(np.float16)).to(device)
-        self.user_dynamic_features = torch.from_numpy(user_dynamic_features.astype(np.float16)).to(device)
+        # self.user_dynamic_features = torch.from_numpy(user_dynamic_features.astype(np.float16)).to(device)
+        # TODO Need a more efficient way to retrieve during training/evaluation
+        # Extract all unique dates and users
+        all_dates = sorted(user_dynamic_features.keys())  # Unique dates
+        all_users = sorted({uid for date in user_dynamic_features for uid in user_dynamic_features[date]})  # Unique users
+        
+        num_dates = len(all_dates)
+        num_users = len(all_users)
+        embedding_dim = 64
+        
+        # Create index mappings
+        date_to_index = {date: idx for idx, date in enumerate(all_dates)}
+        user_to_index = {user_id: idx for idx, user_id in enumerate(all_users)}
+        
+        # Preallocate tensor (num_dates, num_users, embedding_dim)
+        user_dynamic_tensor = torch.zeros((num_dates, num_users, embedding_dim), dtype=torch.float16, device="cuda")
+        
+        # Populate the tensor
+        for date, users in user_dynamic_features.items():
+            date_idx = date_to_index[date]  # Convert date to index
+            for user_id, embedding in users.items():
+                if user_id in user_to_index:  # Ensure user is mapped
+                    user_idx = user_to_index[user_id]
+                    user_dynamic_tensor[date_idx, user_idx] = torch.tensor(embedding, dtype=torch.float16, device="cuda")
+        
+        # Store lookup structures
+        self.user_dynamic_tensor = user_dynamic_tensor
+        self.date_to_index = date_to_index
+        self.user_to_index = user_to_index
+
         self.device = device
 
         self.neighbor_sampler = neighbor_sampler
@@ -342,6 +371,14 @@ class GraphRec(nn.Module):
         # three ndarrays with shape (batch_size, max_seq_length)
         return padded_nodes_neighbor_ids, padded_nodes_edge_ids, padded_nodes_neighbor_times, padded_nodes_neighbor_idx
 
+    def get_user_embedding(self, date, user_id):
+        if date in self.date_to_index and user_id in self.user_to_index:
+            date_idx = self.date_to_index[date]
+            user_idx = self.user_to_index[user_id]
+            return self.user_dynamic_tensor[date_idx, user_idx]  # Fast GPU lookup
+        else:
+            return torch.zeros(64, dtype=torch.float16, device="cuda")  # Return zero vector if not found
+
     def get_features(self, node_interact_times: np.ndarray, padded_nodes_neighbor_ids: np.ndarray, padded_nodes_edge_ids: np.ndarray,
                      padded_nodes_neighbor_times: np.ndarray, time_encoder: TimeEncoder, padded_nodes_neighbor_idx: np.ndarray):
         """
@@ -354,27 +391,75 @@ class GraphRec(nn.Module):
         :param time_encoder: TimeEncoder, time encoder
         :return:
         """
-        # Find locations where `padded_nodes_neighbor_ids <= self.src_max_id`
-        mask = padded_nodes_neighbor_ids <= self.src_max_id  # Boolean mask
-        
-        # Tensor, shape (batch_size, max_seq_length, node_feat_dim)
-        padded_nodes_neighbor_node_raw_features = self.node_raw_features[torch.from_numpy(padded_nodes_neighbor_ids)]
-
-        padded_nodes_neighbor_idx_tensor = torch.from_numpy(padded_nodes_neighbor_idx).to(self.device)
-
-        if mask.any():
-            selected_indices = padded_nodes_neighbor_idx_tensor[mask] - 1
-            user_dynamic_features_subset_tensor = self.user_dynamic_features[selected_indices]
-            padded_nodes_neighbor_node_raw_features[mask] = user_dynamic_features_subset_tensor.view(mask.sum(), -1)
-
-
         # Tensor, shape (batch_size, max_seq_length, time_feat_dim)
         padded_nodes_neighbor_time_features = time_encoder(timestamps=torch.from_numpy(node_interact_times[:, np.newaxis] - padded_nodes_neighbor_times).float().to(self.device))
 
         # ndarray, set the time features to all zeros for the padded timestamp
         padded_nodes_neighbor_time_features[torch.from_numpy(padded_nodes_neighbor_ids == 0)] = 0.0
 
+        # Convert NumPy arrays to PyTorch tensors (on GPU)
+        padded_nodes_neighbor_ids = torch.tensor(padded_nodes_neighbor_ids, dtype=torch.int64, device=self.device)
+        padded_nodes_neighbor_times = torch.tensor(padded_nodes_neighbor_times, dtype=torch.int64, device=self.device)
+    
+        # Boolean mask for valid user nodes
+        mask = padded_nodes_neighbor_ids <= self.src_max_id  # Shape: (batch_size, max_seq_length)
+
+        # Retrieve raw features for all nodes
+        padded_nodes_neighbor_node_raw_features = self.node_raw_features[padded_nodes_neighbor_ids]
+    
+        ### **🔹 Fast User Feature Replacement (Fully Vectorized)**
+        valid_indices = mask.nonzero(as_tuple=True)  # (batch_indices, seq_indices)
+    
+        if valid_indices[0].numel() > 0:  # Ensure we have valid nodes to process
+            # Retrieve corresponding dates and user IDs
+            interact_dates = padded_nodes_neighbor_times[valid_indices]  # Shape: (valid_count,)
+            user_ids = padded_nodes_neighbor_ids[valid_indices]  # Shape: (valid_count,)
+    
+            ### **🔹 Convert date & user mappings into tensors for fast indexing**
+            date_tensor = torch.tensor(list(self.date_to_index.keys()), dtype=torch.int64, device=self.device)
+            date_map = torch.tensor(list(self.date_to_index.values()), dtype=torch.int64, device=self.device)
+            user_tensor = torch.tensor(list(self.user_to_index.keys()), dtype=torch.int64, device=self.device)
+            user_map = torch.tensor(list(self.user_to_index.values()), dtype=torch.int64, device=self.device)
+    
+            # Use torch.searchsorted for fast lookup
+            date_indices = torch.searchsorted(date_tensor, interact_dates)
+            user_indices = torch.searchsorted(user_tensor, user_ids)
+    
+            # Map indices using precomputed tensor (O(1) indexing)
+            date_indices = date_map[date_indices]
+            user_indices = user_map[user_indices]
+    
+            # Mask out invalid indices (date or user not found)
+            valid_mask = (date_indices >= 0) & (user_indices >= 0)
+    
+            if valid_mask.sum() > 0:  # Ensure we have valid embeddings to retrieve
+                date_indices = date_indices[valid_mask]
+                user_indices = user_indices[valid_mask]
+
+                # Ensure date_indices and user_indices are the correct shape
+                date_indices = date_indices.unsqueeze(1)  # Shape: (valid_count, 1)
+                user_indices = user_indices.unsqueeze(1)  # Shape: (valid_count, 1)
+
+                # Gather embeddings correctly
+                user_embeddings = self.user_dynamic_tensor[date_indices, user_indices]  # Shape: (valid_count, 1, 64)
+
+                # print("Shape of user_embeddings:", user_embeddings.shape)
+
+                user_embeddings = user_embeddings.squeeze(1)  # Shape: (valid_count, 64))
+
+                # Pad user embeddings to 128 dimensions
+                user_embeddings_padded = torch.zeros((user_embeddings.shape[0], 128), dtype=torch.float16, device=self.device)
+                user_embeddings_padded[:, :64] = user_embeddings  # Avoids extra tensor concatenation
+
+                user_embeddings_padded = user_embeddings_padded.to(padded_nodes_neighbor_node_raw_features.dtype)
+ 
+                # padded_nodes_neighbor_node_raw_features[valid_indices[0], valid_indices[1], :] = user_embeddings_padded
+                padded_nodes_neighbor_node_raw_features.index_put_(
+                    (valid_indices[0], valid_indices[1]), user_embeddings_padded
+                )
+ 
         return padded_nodes_neighbor_node_raw_features.float(), padded_nodes_neighbor_time_features
+
 
     def get_patches(self, padded_nodes_neighbor_node_raw_features: torch.Tensor, padded_nodes_neighbor_time_features: torch.Tensor,
                     padded_nodes_edge_raw_features: torch.Tensor = None, padded_nodes_neighbor_co_occurrence_features: torch.Tensor = None, patch_size: int = 1):

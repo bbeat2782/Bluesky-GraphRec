@@ -136,62 +136,62 @@ def preprocess_data(dataset_name: str, bipartite: bool = True, node_feat_dim: in
         global_item_id = row['item_id']
         node_feats[global_item_id] = row['embeddings']
         
-    start_time = time.time()
-    # Current format of ts: `20230101024321.0` (`YYYYMMDDHHMMSS`) --> change to datetime obj
-    new_df['ts'] = pd.to_datetime(new_df['ts'].astype(int).astype(str), format='%Y%m%d%H%M%S')
+    # start_time = time.time()
+    # # Current format of ts: `20230101024321.0` (`YYYYMMDDHHMMSS`) --> change to datetime obj
+    # new_df['ts'] = pd.to_datetime(new_df['ts'].astype(int).astype(str), format='%Y%m%d%H%M%S')
 
-    history_size = 10
+    # history_size = 10
 
-    # Ensure dataframe is sorted
-    new_df = new_df.sort_values(by=['u', 'ts']).reset_index(drop=True)
+    # # Ensure dataframe is sorted
+    # new_df = new_df.sort_values(by=['u', 'ts']).reset_index(drop=True)
     
-    # Convert to NumPy for fast access
-    user_ids = new_df['u'].values
-    item_ids = new_df['i'].values
-    embeddings = node_feats[item_ids].astype(np.float16)  # Direct NumPy lookup
+    # # Convert to NumPy for fast access
+    # user_ids = new_df['u'].values
+    # item_ids = new_df['i'].values
+    # embeddings = node_feats[item_ids].astype(np.float16)  # Direct NumPy lookup
     
-    # Initialize output array
-    user_dynamic_features = np.zeros_like(embeddings, dtype=np.float16)
+    # # Initialize output array
+    # user_dynamic_features = np.zeros_like(embeddings, dtype=np.float16)
     
-    # Process in batch using NumPy slicing
-    unique_users, user_starts = np.unique(user_ids, return_index=True)
-    for idx, start in enumerate(user_starts):
-        end = user_starts[idx + 1] if idx + 1 < len(user_starts) else len(user_ids)
+    # # Process in batch using NumPy slicing
+    # unique_users, user_starts = np.unique(user_ids, return_index=True)
+    # for idx, start in enumerate(user_starts):
+    #     end = user_starts[idx + 1] if idx + 1 < len(user_starts) else len(user_ids)
         
-        user_embeds = embeddings[start:end]  # Extract all embeddings for this user
-        num_interactions = len(user_embeds)
+    #     user_embeds = embeddings[start:end]  # Extract all embeddings for this user
+    #     num_interactions = len(user_embeds)
     
-        if num_interactions == 1:
-            # If only one interaction exists, set to zeros (no past interactions to average)
-            user_dynamic_features[start:end] = np.zeros_like(user_embeds)
-            continue
+    #     if num_interactions == 1:
+    #         # If only one interaction exists, set to zeros (no past interactions to average)
+    #         user_dynamic_features[start:end] = np.zeros_like(user_embeds)
+    #         continue
     
-        # Compute cumulative sum
-        cumsum = np.cumsum(user_embeds, axis=0)
+    #     # Compute cumulative sum
+    #     cumsum = np.cumsum(user_embeds, axis=0)
     
-        # Compute rolling sum while excluding current embedding
-        rolling_sum = np.zeros_like(user_embeds)
-        for i in range(num_interactions):
-            start_idx = max(0, i - history_size)
-            past_sum = cumsum[i - 1] - (cumsum[start_idx - 1] if start_idx > 0 else 0)
-            rolling_sum[i] = past_sum
+    #     # Compute rolling sum while excluding current embedding
+    #     rolling_sum = np.zeros_like(user_embeds)
+    #     for i in range(num_interactions):
+    #         start_idx = max(0, i - history_size)
+    #         past_sum = cumsum[i - 1] - (cumsum[start_idx - 1] if start_idx > 0 else 0)
+    #         rolling_sum[i] = past_sum
     
-        # Compute rolling mean excluding the current embedding
-        valid_counts = np.minimum(np.arange(num_interactions), history_size)[:, None]  # Excludes current element
-        rolling_mean = rolling_sum / np.maximum(valid_counts, 1)  # Avoid division by zero
+    #     # Compute rolling mean excluding the current embedding
+    #     valid_counts = np.minimum(np.arange(num_interactions), history_size)[:, None]  # Excludes current element
+    #     rolling_mean = rolling_sum / np.maximum(valid_counts, 1)  # Avoid division by zero
     
-        # Explicitly set the first interaction to a zero vector
-        rolling_mean[0] = np.zeros_like(user_embeds[0])
+    #     # Explicitly set the first interaction to a zero vector
+    #     rolling_mean[0] = np.zeros_like(user_embeds[0])
     
-        # Store result
-        user_dynamic_features[start:end] = rolling_mean
+    #     # Store result
+    #     user_dynamic_features[start:end] = rolling_mean
     
-    # Restore the original order before saving
-    new_df['user_dynamic_features'] = list(user_dynamic_features)
-    new_df = new_df.sort_values(by='idx')
+    # # Restore the original order before saving
+    # new_df['user_dynamic_features'] = list(user_dynamic_features)
+    # new_df = new_df.sort_values(by='idx')
 
-    np.savez_compressed("/home/sgan/user_dynamic_features.npz", 
-                    user_dynamic_features=np.array(new_df['user_dynamic_features'].tolist(), dtype=np.float16))
+    # np.savez_compressed("/home/sgan/user_dynamic_features.npz", 
+    #                 user_dynamic_features=np.array(new_df['user_dynamic_features'].tolist(), dtype=np.float16))
 
     
     print('number of nodes ', node_feats.shape[0] - 1)
