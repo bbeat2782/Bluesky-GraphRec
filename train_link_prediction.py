@@ -11,6 +11,8 @@ import torch
 import torch.nn as nn
 from torch.amp import autocast
 
+from models.TGAT import TGAT
+from models.CAWN import CAWN
 from models.GraphRec import GraphRec
 from models.modules import MergeLayer
 from utils.utils import set_random_seed, convert_to_gpu, get_parameter_sizes, create_optimizer, save_plot
@@ -32,7 +34,7 @@ if __name__ == "__main__":
     args = get_link_prediction_args(is_evaluation=False)
 
     # get data for training, validation and testing
-    node_raw_features, _, full_data, train_data, val_data, test_data, new_node_val_data, new_node_test_data, user_dynamic_features = \
+    node_raw_features, edge_raw_features, full_data, train_data, val_data, test_data, new_node_val_data, new_node_test_data, user_dynamic_features = \
         get_link_prediction_data(dataset_name=args.dataset_name, val_ratio=args.val_ratio, test_ratio=args.test_ratio)
 
     # initialize training neighbor sampler to retrieve temporal graph
@@ -96,6 +98,13 @@ if __name__ == "__main__":
                                          time_feat_dim=args.time_feat_dim, channel_embedding_dim=args.channel_embedding_dim, patch_size=args.patch_size,
                                          num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout,
                                          max_input_sequence_length=args.max_input_sequence_length, device=args.device, user_dynamic_features=user_dynamic_features, src_max_id=train_data.src_max_id)
+        elif args.model_name == 'TGAT':
+            dynamic_backbone = TGAT(node_raw_features=node_raw_features, edge_raw_features=edge_raw_features, neighbor_sampler=train_neighbor_sampler,
+                                    time_feat_dim=args.time_feat_dim, num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout, device=args.device)
+        elif args.model_name == 'CAWN':
+            dynamic_backbone = CAWN(node_raw_features=node_raw_features, edge_raw_features=edge_raw_features, neighbor_sampler=train_neighbor_sampler,
+                                    time_feat_dim=args.time_feat_dim, position_feat_dim=args.position_feat_dim, walk_length=args.walk_length,
+                                    num_walk_heads=args.num_walk_heads, dropout=args.dropout, device=args.device)
         else:
             raise ValueError(f"Wrong value for model_name {args.model_name}!")
         link_predictor = MergeLayer(input_dim1=node_raw_features.shape[1], input_dim2=node_raw_features.shape[1],
@@ -129,7 +138,7 @@ if __name__ == "__main__":
         for epoch in range(args.num_epochs):
 
             model.train()
-            if args.model_name in ['GraphRec']:
+            if args.model_name in ['GraphRec', 'TGAT', 'CAWN']:
                 # training, only use training graph
                 model[0].set_neighbor_sampler(train_neighbor_sampler)
 
@@ -183,6 +192,35 @@ if __name__ == "__main__":
                     node_feat_dim = batch_neg_src_node_embeddings.shape[1]  # Get feature dimension
                     batch_neg_src_node_embeddings = batch_neg_src_node_embeddings.reshape(len(batch_src_node_ids), 4, node_feat_dim)
                     batch_neg_dst_node_embeddings = batch_neg_dst_node_embeddings.reshape(len(batch_src_node_ids), 4, node_feat_dim)
+                elif args.model_name in ['TGAT', 'CAWN']:
+                    # get temporal embedding of source and destination nodes
+                    # two Tensors, with shape (batch_size, node_feat_dim)
+                    batch_src_node_embeddings, batch_dst_node_embeddings = \
+                        model[0].compute_src_dst_node_temporal_embeddings(src_node_ids=batch_src_node_ids,
+                                                                          dst_node_ids=batch_dst_node_ids,
+                                                                          node_interact_times=batch_node_interact_times,
+                                                                          num_neighbors=args.num_neighbors)
+
+
+                    # Flatten negative samples to compute embeddings properly
+                    batch_neg_src_node_ids_flat = batch_neg_src_node_ids.flatten()  # (batch_size * 4,)
+                    batch_neg_dst_node_ids_flat = batch_neg_dst_node_ids.flatten()  # (batch_size * 4,)
+                    batch_neg_times_flat = np.repeat(batch_node_interact_times, 4, axis=0).flatten()  # (batch_size * 4,)
+                    batch_neg_src_idx_flat = batch_neg_src_idx.flatten()  # (batch_size * 4,)
+
+                    # get temporal embedding of negative source and negative destination nodes
+                    # two Tensors, with shape (batch_size, node_feat_dim)
+                    batch_neg_src_node_embeddings, batch_neg_dst_node_embeddings = \
+                        model[0].compute_src_dst_node_temporal_embeddings(src_node_ids=batch_neg_src_node_ids_flat,
+                                                                          dst_node_ids=batch_neg_dst_node_ids_flat,
+                                                                          node_interact_times=batch_neg_times_flat,
+                                                                          num_neighbors=args.num_neighbors)
+
+                    # Reshape back to (batch_size, 4, node_feat_dim) so that each positive has 4 negatives
+                    node_feat_dim = batch_neg_src_node_embeddings.shape[1]  # Get feature dimension
+                    batch_neg_src_node_embeddings = batch_neg_src_node_embeddings.reshape(len(batch_src_node_ids), 4, node_feat_dim)
+                    batch_neg_dst_node_embeddings = batch_neg_dst_node_embeddings.reshape(len(batch_src_node_ids), 4, node_feat_dim)
+
                 else:
                     raise ValueError(f"Wrong value for model_name {args.model_name}!")
 
@@ -260,7 +298,7 @@ if __name__ == "__main__":
                 "new_val_pairwise_acc_history": new_val_pairwise_acc_history,
             }
             
-            with open("saved_results/GraphRec/bluesky/training_results.json", "w") as f:
+            with open(f"saved_results/{args.model_name}/bluesky/training_results_{args.seed}.json", "w") as f:
                 json.dump(training_results, f, indent=4)
 
             logger.info(f'Epoch: {epoch + 1}, learning rate: {optimizer.param_groups[0]["lr"]}, train loss: {np.mean(train_losses):.4f}')
@@ -410,7 +448,7 @@ if __name__ == "__main__":
             "new_val_pairwise_acc_history": new_val_pairwise_acc_history,
         }
         
-        with open("saved_results/GraphRec/bluesky/training_results.json", "w") as f:
+        with open(f"saved_results/{args.model_name}/bluesky/training_results_{args.seed}.json", "w") as f:
             json.dump(training_results, f, indent=4)
 
         # Save plots using the function
@@ -419,7 +457,7 @@ if __name__ == "__main__":
             ["Train Loss", "Validation Loss", "New Node Validation Loss"],
             "Training and Validation Loss",
             "Loss",
-            "saved_results/GraphRec/bluesky/training_loss_plot.png",
+            f"saved_results/{args.model_name}/bluesky/training_loss_plot_{args.seed}.png",
         )
         
         save_plot(
@@ -427,7 +465,7 @@ if __name__ == "__main__":
             ["Train Accuracy", "Validation Accuracy", "New Node Validation Accuracy"],
             "Training and Validation Accuracy",
             "Accuracy",
-            "saved_results/GraphRec/bluesky/training_accuracy_plot.png",
+            f"saved_results/{args.model_name}/bluesky/training_accuracy_plot_{args.seed}.png",
         )
         
         save_plot(
@@ -435,7 +473,7 @@ if __name__ == "__main__":
             ["Train Pairwise Accuracy", "Validation Pairwise Accuracy", "New Node Validation Pairwise Accuracy"],
             "Training and Validation Pairwise Accuracy",
             "Pairwise Accuracy",
-            "saved_results/GraphRec/bluesky/training_pairwise_accuracy_plot.png",
+            f"saved_results/{args.model_name}/bluesky/training_pairwise_accuracy_plot_{args.seed}.png",
         )
 
         # save model result

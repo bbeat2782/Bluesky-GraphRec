@@ -4,7 +4,7 @@ This repository is built for the project **Bluesky: Post Recommendation**, prima
 
 ## Overview
 
-TODO
+Bluesky-GraphRec is a dynamic post recommendation system for Bluesky, leveraging DyGFormer to model evolving user-post interactions over time. Unlike static methods, our approach incorporates graph-based recommendations with temporal learning, ensuring personalized and adaptive suggestions. We implement efficient candidate generation and evaluate performance using dynamic link prediction tasks. The system is benchmarked against models like TGAT, analyzing whether recommendations favor popular content or promote diverse engagement.
 
 ## Environments
 Follow these steps to set up the `bluesky` environment:
@@ -26,10 +26,15 @@ pip install -r requirements.txt
 ```
 
 ## Preprocessing
-
+For extracting interactions from duckdb and converting text to text embeddings.
 ```{bash}
 cd preprocess_data/
 python extract_from_duckdb.py
+```
+
+For creating user features using SVD on a consumer-producer graph.
+```{bash}
+python preprocess_user_features.py
 ```
 
 We can run ```preprocess_data/preprocess_data.py``` for pre-processing the datasets.
@@ -46,14 +51,24 @@ python preprocess_data.py  --dataset_name bluesky
 #### Model Training
 * Training *GraphRec* on *Bluesky* dataset:
 ```{bash}
-python train_link_prediction.py --dataset_name bluesky --model_name GraphRec --patch_size 2 --max_input_sequence_length 64 --num_runs 1 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 30
+python train_link_prediction.py --dataset_name bluesky --model_name GraphRec --patch_size 2 --max_input_sequence_length 64 --num_runs 1 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2
 ```
+
+* Training *TGAT* on *Bluesky* dataset:
+```{bash}
+python train_link_prediction.py --dataset_name bluesky --model_name TGAT --num_runs 1 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_neighbors 64 --num_layers 1 --num_heads 2
+```
+
 #### Model Evaluation
 * Evaluating *GraphRec* with posts that received at least one like in the last 20 minutes as candidate generation on *Bluesky* dataset:
 ```{bash}
-python evaluate_link_prediction_v2.py --dataset_name bluesky --model_name GraphRec --patch_size 2 --max_input_sequence_length 64 --negative_sample_strategy real --num_runs 1 --gpu 0 --batch_size 4
+python evaluate_link_prediction.py --dataset_name bluesky --model_name GraphRec --patch_size 2 --max_input_sequence_length 64 --negative_sample_strategy real --num_runs 1 --gpu 0 --batch_size 4
 ```
 
+* Evaluating *TGAT* with posts that received at least one like in the last 20 minutes as candidate generation on *Bluesky* dataset:
+```{bash}
+python evaluate_link_prediction.py --dataset_name bluesky --model_name TGAT --negative_sample_strategy real --num_runs 1 --gpu 0 --batch_size 4 --num_neighbors 64 --num_layers 1 --num_heads 2
+```
 
 ## Acknowledgments
 

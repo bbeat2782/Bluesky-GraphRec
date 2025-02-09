@@ -642,27 +642,6 @@ class MultipleNegativeEdgeSampler(object):
             # set of observed edges
             self.observed_edges = self.get_unique_edges_between_start_end_time(self.earliest_time, self.last_observed_time)
 
-        if self.negative_sample_strategy == 'real':
-            # Convert the string to a datetime object
-            observed_datetime = datetime.strptime(self.last_observed_time, "%Y%m%d%H%M%S.%f")
-            
-            # Subtract 3 days
-            three_days_before = observed_datetime - timedelta(days=3)
-
-            print('earliest_time', self.earliest_time)
-            print('three_days_before', three_days_before)
-            print('last_observed_time', self.last_observed_time)
-
-            raise ValueError()
-            
-
-            self.observed_edges = self.get_unique_edges_between_start_end_time(three_days_before, self.last_observed_time)
-
-            print('three_days_before', three_days_before)
-            print('last_observed_time', self.last_observed_time)
-            print('size of candidates', len(self.observed_edges))
-            raise ValueError()
-
         if self.seed is not None:
             self.random_state = np.random.RandomState(self.seed)
 
@@ -755,26 +734,9 @@ class MultipleNegativeEdgeSampler(object):
 
         original_batch_size = size
         size = 4 * size
-
-        # # Convert float timestamps to datetime objects
-        # current_start_dt = current_batch_start_time[0]
-    
-        # # Compute time range (subtract 20 minutes)
-        # time_20_min_before_dt = current_start_dt - 20
-    
-        # # Get historical edges in the past 20 minutes
-        # historical_edges = self.get_unique_edges_between_start_end_time(
-        #     start_time=time_20_min_before_dt, end_time=current_start_dt
-        # )
-        # Convert float timestamps to datetime objects
-        # current_start_dt = datetime.strptime(str(int(current_batch_start_time[0])), "%Y%m%d%H%M%S")
-
         
         time_20_min_before_start = current_batch_start_time[0] - 60*20  # (time is in sec)
-    
-        # Compute time range (subtract 20 minutes)
-        # time_20_min_before_dt = float((current_start_dt - timedelta(minutes=20)).strftime("%Y%m%d%H%M%S"))
-    
+        
         # Get historical edges in the past 20 minutes
         historical_edges = self.get_unique_edges_between_start_end_time(
             start_time=time_20_min_before_start, end_time=current_batch_start_time[0]

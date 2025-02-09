@@ -9,7 +9,6 @@ import argparse
 import os
 import json
 import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
 
 from utils.metrics import get_link_prediction_metrics
 from utils.utils import set_random_seed
@@ -39,7 +38,7 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
     model[0].set_neighbor_sampler(neighbor_sampler)
     model.eval()
     candidates_length = {}
-    recommended_posts = {}
+    recommended_posts = []
 
     with torch.no_grad():
         # store evaluate losses and metrics
@@ -109,15 +108,25 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                 batch_interact_times = np.concatenate(batch_interact_times)
                 batch_src_ids = np.concatenate(batch_src_ids)
                 batch_idx = np.concatenate(batch_idx)
-    
-                # Compute embeddings in one operation
-                # TODO need to optimize this part
-                src_embeddings, dst_embeddings = model[0].compute_src_dst_node_temporal_embeddings(
-                    src_node_ids=batch_src_ids,
-                    dst_node_ids=batch_candidates,
-                    node_interact_times=batch_interact_times,
-                    batch_src_idx=batch_idx
-                )
+
+                if model_name == 'GraphRec':
+                    # Compute embeddings in one operation
+                    # TODO need to optimize this part
+                    src_embeddings, dst_embeddings = model[0].compute_src_dst_node_temporal_embeddings(
+                        src_node_ids=batch_src_ids,
+                        dst_node_ids=batch_candidates,
+                        node_interact_times=batch_interact_times,
+                        batch_src_idx=batch_idx
+                    )
+                elif model_name == 'TGAT':
+                    # Compute embeddings in one operation
+                    # TODO need to optimize this part
+                    src_embeddings, dst_embeddings = model[0].compute_src_dst_node_temporal_embeddings(
+                        src_node_ids=batch_src_ids,
+                        dst_node_ids=batch_candidates,
+                        node_interact_times=batch_interact_times,
+                        num_neighbors=num_neighbors
+                    )
     
                 # Compute scores for all user-candidate pairs in the batch
                 probabilities = model[1](input_1=src_embeddings, input_2=dst_embeddings).squeeze(dim=-1).sigmoid()
@@ -153,50 +162,30 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                     sorted_indices = np.argsort(-post_probabilities)  # Negative sign for descending order
                 
                     # Apply sorted indices to both arrays
-                    sorted_probabilities = post_probabilities[sorted_indices]
+                    #sorted_probabilities = post_probabilities[sorted_indices]
                     sorted_candidates = post_candidates[sorted_indices]
 
-                    # Find index of true_dst_id in sorted candidates
-                    true_dst_index = np.where(sorted_candidates == true_dst_id)[0]
-                
-                    if len(true_dst_index) > 0:
-                        true_dst_index = true_dst_index[0]  # Extract integer index
-                    else:
-                        true_dst_index = None  # Handle case where true_dst_id is missing
-                
-                    # Save top posts up to true_dst_id (if found)
-                    if true_dst_index is not None:
-                        top_candidates = sorted_candidates[:true_dst_index + 1]  # Includes true_dst_id
-                    else:
-                        top_candidates = np.array([])  # Empty if true_dst_id is missing
-                
-                    # Save last 20 or 30 posts
-                    last_candidates = sorted_candidates[-30:]
-                
-                    # Store results in dictionary
-                    recommended_posts[str(true_dst_id)] = {
-                        "top_candidates": top_candidates.tolist(),
-                        "last_candidates": last_candidates.tolist()
-                    }
+                    recommended_posts.append(sorted_candidates.tolist()) 
 
     # NOTE: For checking which posts are recommended. Comment this when you do not need it
     # Create directory if it doesn't exist
-    save_dir = "saved_results/GraphRec/bluesky"
+    save_dir = f"saved_results/{model_name}/bluesky"
     os.makedirs(save_dir, exist_ok=True)
     
     # Save to JSON file
     save_path = os.path.join(save_dir, "recommended_posts.json")
     with open(save_path, "w") as json_file:
         json.dump(recommended_posts, json_file, indent=4)
+
     #################################################################################
     
-    np.save("saved_results/GraphRec/bluesky/mrr_results.npy", np.array(mrr_results))
+    np.save(f"saved_results/{model_name}/bluesky/mrr_results.npy", np.array(mrr_results))
     avg_mrr = sum(mrr_results) / len(mrr_results)
     
     print(f"Mean Reciprocal Rank (MRR): {avg_mrr}")
 
     # Save the candidates_length dictionary to a JSON file
-    output_dict_path = "saved_results/GraphRec/bluesky/candidates_length.json"
+    output_dict_path = f"saved_results/{model_name}/bluesky/candidates_length.json"
     with open(output_dict_path, 'w') as f:
        json.dump(candidates_length, f, indent=4)
 
@@ -212,7 +201,7 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
     plt.grid(axis='y', linestyle='--', alpha=0.7)
     
     # Save the plot
-    output_path = "saved_results/GraphRec/bluesky/candidates_length_histogram.png"
+    output_path = f"saved_results/{model_name}/bluesky/candidates_length_histogram.png"
     plt.savefig(output_path)
     plt.close()
 
@@ -239,7 +228,7 @@ def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_s
     assert evaluate_neg_edge_sampler.seed is not None
     evaluate_neg_edge_sampler.reset_random_state()
 
-    if model_name in ['GraphRec']:
+    if model_name in ['GraphRec', 'TGAT', 'CAWN']:
         # evaluation phase use all the graph information
         model[0].set_neighbor_sampler(neighbor_sampler)
 
@@ -296,6 +285,33 @@ def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_s
                                                                       dst_node_ids=batch_neg_dst_node_ids_flat,
                                                                       node_interact_times=batch_neg_times_flat,
                                                                       batch_src_idx=batch_neg_src_idx_flat)
+
+                # Reshape back to (batch_size, 4, node_feat_dim) so that each positive has 4 negatives
+                node_feat_dim = batch_neg_src_node_embeddings.shape[1]  # Get feature dimension
+                batch_neg_src_node_embeddings = batch_neg_src_node_embeddings.reshape(len(batch_src_node_ids), 4, node_feat_dim)
+                batch_neg_dst_node_embeddings = batch_neg_dst_node_embeddings.reshape(len(batch_src_node_ids), 4, node_feat_dim)
+            elif model_name in ['TGAT', 'CAWN']:
+                # get temporal embedding of source and destination nodes
+                # two Tensors, with shape (batch_size, node_feat_dim)
+                batch_src_node_embeddings, batch_dst_node_embeddings = \
+                    model[0].compute_src_dst_node_temporal_embeddings(src_node_ids=batch_src_node_ids,
+                                                                      dst_node_ids=batch_dst_node_ids,
+                                                                      node_interact_times=batch_node_interact_times,
+                                                                      num_neighbors=num_neighbors)
+
+                # Flatten negative samples to compute embeddings properly
+                batch_neg_src_node_ids_flat = batch_neg_src_node_ids.flatten()  # (batch_size * 4,)
+                batch_neg_dst_node_ids_flat = batch_neg_dst_node_ids.flatten()  # (batch_size * 4,)
+                batch_neg_times_flat = np.repeat(batch_node_interact_times, 4, axis=0).flatten()  # (batch_size * 4,)
+                batch_neg_src_idx_flat = batch_neg_src_idx.flatten()  # (batch_size * 4,)
+
+                # get temporal embedding of negative source and negative destination nodes
+                # two Tensors, with shape (batch_size, node_feat_dim)
+                batch_neg_src_node_embeddings, batch_neg_dst_node_embeddings = \
+                    model[0].compute_src_dst_node_temporal_embeddings(src_node_ids=batch_neg_src_node_ids_flat,
+                                                                      dst_node_ids=batch_neg_dst_node_ids_flat,
+                                                                      node_interact_times=batch_neg_times_flat,
+                                                                      num_neighbors=num_neighbors)
 
                 # Reshape back to (batch_size, 4, node_feat_dim) so that each positive has 4 negatives
                 node_feat_dim = batch_neg_src_node_embeddings.shape[1]  # Get feature dimension
