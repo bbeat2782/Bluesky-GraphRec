@@ -424,6 +424,9 @@ class GraphRec(nn.Module):
             # Use torch.searchsorted for fast lookup
             date_indices = torch.searchsorted(date_tensor, interact_dates)
             user_indices = torch.searchsorted(user_tensor, user_ids)
+
+            date_indices = torch.clamp(date_indices, min=0, max=date_map.shape[0] - 1)
+            user_indices = torch.clamp(user_indices, min=0, max=user_map.shape[0] - 1)
     
             # Map indices using precomputed tensor (O(1) indexing)
             date_indices = date_map[date_indices]
@@ -431,32 +434,31 @@ class GraphRec(nn.Module):
     
             # Mask out invalid indices (date or user not found)
             valid_mask = (date_indices >= 0) & (user_indices >= 0)
-    
-            if valid_mask.sum() > 0:  # Ensure we have valid embeddings to retrieve
-                date_indices = date_indices[valid_mask]
-                user_indices = user_indices[valid_mask]
 
-                # Ensure date_indices and user_indices are the correct shape
-                date_indices = date_indices.unsqueeze(1)  # Shape: (valid_count, 1)
-                user_indices = user_indices.unsqueeze(1)  # Shape: (valid_count, 1)
+            date_indices = date_indices[valid_mask]
+            user_indices = user_indices[valid_mask]
 
-                # Gather embeddings correctly
-                user_embeddings = self.user_dynamic_tensor[date_indices, user_indices]  # Shape: (valid_count, 1, 64)
+            # Ensure date_indices and user_indices are the correct shape
+            date_indices = date_indices.unsqueeze(1)  # Shape: (valid_count, 1)
+            user_indices = user_indices.unsqueeze(1)  # Shape: (valid_count, 1)
 
-                # print("Shape of user_embeddings:", user_embeddings.shape)
+            # Gather embeddings correctly
+            user_embeddings = self.user_dynamic_tensor[date_indices, user_indices]  # Shape: (valid_count, 1, 64)
 
-                user_embeddings = user_embeddings.squeeze(1)  # Shape: (valid_count, 64))
+            # print("Shape of user_embeddings:", user_embeddings.shape)
 
-                # Pad user embeddings to 128 dimensions
-                user_embeddings_padded = torch.zeros((user_embeddings.shape[0], 128), dtype=torch.float16, device=self.device)
-                user_embeddings_padded[:, :64] = user_embeddings  # Avoids extra tensor concatenation
+            user_embeddings = user_embeddings.squeeze(1)  # Shape: (valid_count, 64))
 
-                user_embeddings_padded = user_embeddings_padded.to(padded_nodes_neighbor_node_raw_features.dtype)
- 
-                # padded_nodes_neighbor_node_raw_features[valid_indices[0], valid_indices[1], :] = user_embeddings_padded
-                padded_nodes_neighbor_node_raw_features.index_put_(
-                    (valid_indices[0], valid_indices[1]), user_embeddings_padded
-                )
+            # Pad user embeddings to 128 dimensions
+            user_embeddings_padded = torch.zeros((user_embeddings.shape[0], 128), dtype=torch.float16, device=self.device)
+            user_embeddings_padded[:, :64] = user_embeddings  # Avoids extra tensor concatenation
+
+            user_embeddings_padded = user_embeddings_padded.to(padded_nodes_neighbor_node_raw_features.dtype)
+
+            # padded_nodes_neighbor_node_raw_features[valid_indices[0], valid_indices[1], :] = user_embeddings_padded
+            padded_nodes_neighbor_node_raw_features.index_put_(
+                (valid_indices[0], valid_indices[1]), user_embeddings_padded
+            )
  
         return padded_nodes_neighbor_node_raw_features.float(), padded_nodes_neighbor_time_features
 
