@@ -1,5 +1,45 @@
-# Capstone Example Jekyll Website
+# Evaluating Graph Transformers for Scalable Social Media Recommendations
 
-This is about as **barebones** as a Jekyll site can be. All I've done is embed a plotly plot here.
+## Home
 
-<iframe src="assets/example-map.html" width=800 height=600 frameBorder=0></iframe>
+---
+
+## Introduction
+### What is the problem?
+
+### Why is this important?
+
+---
+
+## Methods
+### Overview
+
+### Pipeline
+
+---
+
+## Evaluation & Metrics
+### Key Metrics
+
+---
+
+## Results
+### Model Performance Comparison
+
+### Rank vs. Popularity Visualization
+
+---
+
+## Real-World Impact
+
+---
+
+## Future Work
+
+---
+
+## Acknowledgments
+
+---
+
+## References
