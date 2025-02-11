@@ -151,3 +151,5 @@ lightgcn
 *.ipynb
 
 .cursorrules
+
+.env.local
