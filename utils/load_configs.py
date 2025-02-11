@@ -15,20 +15,20 @@ def get_link_prediction_args(is_evaluation: bool = False):
                         choices=['bluesky'])
     parser.add_argument('--batch_size', type=int, default=200, help='batch size')
     parser.add_argument('--model_name', type=str, default='GraphRec', help='name of the model, note that EdgeBank is only applicable for evaluation',
-                        choices=['GraphRec'])
+                        choices=['GraphRec', 'TGAT', 'CAWN'])
     parser.add_argument('--gpu', type=int, default=0, help='number of gpu to use')
     parser.add_argument('--num_neighbors', type=int, default=20, help='number of neighbors to sample for each node')
     parser.add_argument('--sample_neighbor_strategy', type=str, default='recent', choices=['uniform', 'recent', 'time_interval_aware'], help='how to sample historical neighbors')
     parser.add_argument('--time_scaling_factor', default=1e-6, type=float, help='the hyperparameter that controls the sampling preference with time interval, '
                         'a large time_scaling_factor tends to sample more on recent links, 0.0 corresponds to uniform sampling, '
                         'it works when sample_neighbor_strategy == time_interval_aware')
-    parser.add_argument('--num_walk_heads', type=int, default=8, help='number of heads used for the attention in walk encoder')
+    parser.add_argument('--num_walk_heads', type=int, default=4, help='number of heads used for the attention in walk encoder')
     parser.add_argument('--num_heads', type=int, default=2, help='number of heads used in attention layer')
     parser.add_argument('--num_layers', type=int, default=2, help='number of model layers')
     parser.add_argument('--walk_length', type=int, default=1, help='length of each random walk')
     parser.add_argument('--time_gap', type=int, default=2000, help='time gap for neighbors to compute node features')
     parser.add_argument('--time_feat_dim', type=int, default=100, help='dimension of the time embedding')
-    parser.add_argument('--position_feat_dim', type=int, default=172, help='dimension of the position embedding')
+    parser.add_argument('--position_feat_dim', type=int, default=100, help='dimension of the position embedding')
     parser.add_argument('--edge_bank_memory_mode', type=str, default='unlimited_memory', help='how memory of EdgeBank works',
                         choices=['unlimited_memory', 'time_window_memory', 'repeat_threshold_memory'])
     parser.add_argument('--time_window_mode', type=str, default='fixed_proportion', help='how to select the time window size for time window memory',
