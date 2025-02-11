@@ -3,19 +3,16 @@ import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import normalize
 
-def factorize(coo_matrix, algorithm='svd', n_components=128, n_clusters=100, device='cuda'):
+def factorize(coo_matrix, n_components=128, n_clusters=100, device='cuda'):
     """
     Factorize the input matrix using PyTorch's SVD implementation.
     
     Args:
         coo_matrix: scipy sparse COO matrix of shape (n_consumers, n_producers)
-        algorithm: 'svd' only for now
         n_components: dimensionality of the embedding space
         n_clusters: number of producer communities
         device: 'cuda' or 'cpu'
     """
-    if algorithm != 'svd':
-        raise ValueError("Only 'svd' algorithm is supported in this implementation")
     
     # Convert scipy COO to torch sparse
     # Note: matrix.T because torch expects (n_features, n_samples)
@@ -60,7 +57,7 @@ def factorize(coo_matrix, algorithm='svd', n_components=128, n_clusters=100, dev
     
     producer_community_affinities = 1 - (assigned_distances / assigned_distances.max())
     
-    return producer_community_affinities, consumer_embeddings_norm, kmeans.cluster_centers_
+    return producer_communities, producer_community_affinities, consumer_embeddings_norm, producer_embeddings_norm, kmeans.cluster_centers_
 
 
 
