@@ -37,3 +37,14 @@ Flow in train_link_prediction.py:
 │ └── For validation/testing:                │
 │     └── Sample neighbors for evaluation    │
 └─────────────────────────────────────────────┘
+
+
+Time ─────────────────────────────────────────────────────────►
+t=1    t=2    t=3    t=4    t=5    current_time=t=6
+ │      │      │      │      │            │
+ ▼      ▼      ▼      ▼      ▼            ▼
+[U1]───[P1]   [U1]───[P4]   [U1]───[P7]   [U1]???[P?]
+ │             │             │              
+[U2]───[P2]   [U2]───[P5]   [U3]───[P8]    Want to predict:
+ │             │             │              U1's next interaction
+[U3]───[P3]   [U3]───[P6]   [U2]───[P9]

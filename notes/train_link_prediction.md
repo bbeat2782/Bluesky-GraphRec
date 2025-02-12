@@ -8,9 +8,10 @@ train_link_prediction.py
 |--[Main Training Loop]
     |
     |--[Data Preparation]
-    |   |--Load data (train/val/test)
-    |   |--Initialize samplers
-    |   |--Create data loaders
+    |   |--Load data (train/val/test) get_link_prediction_data
+            
+    |   |--Initialize samplers 
+    |   |--Create data loaders 
     |
     |--[Multiple Training Runs]
         |

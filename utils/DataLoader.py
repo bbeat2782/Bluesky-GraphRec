@@ -80,7 +80,7 @@ def get_link_prediction_data(dataset_name: str, val_ratio: float, test_ratio: fl
     graph_df = pd.read_csv('./processed_data/{}/ml_{}.csv'.format(dataset_name, dataset_name))
     edge_raw_features = np.load('./processed_data/{}/ml_{}.npy'.format(dataset_name, dataset_name))
     node_raw_features = np.load('./processed_data/{}/ml_{}_node.npy'.format(dataset_name, dataset_name))
-    dynamic_user_features_path = '/home/sgan/private/DyGLib/DG_data/bluesky/user_dynamic_features.pkl'
+    dynamic_user_features_path = './DG_data/bluesky/user_dynamic_features.pkl'
     with open(dynamic_user_features_path, "rb") as file:
         dynamic_user_features = pickle.load(file)
 
