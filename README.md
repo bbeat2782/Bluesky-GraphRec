@@ -51,23 +51,23 @@ python preprocess_data.py  --dataset_name bluesky
 #### Model Training
 * Training *GraphRec* on *Bluesky* dataset:
 ```{bash}
-python train_link_prediction.py --dataset_name bluesky --model_name GraphRec --patch_size 2 --max_input_sequence_length 64 --num_runs 1 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2
+python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 2 --max_input_sequence_length 64 --num_runs 1 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2 --seed 42
 ```
 
 * Training *TGAT* on *Bluesky* dataset:
 ```{bash}
-python train_link_prediction.py --dataset_name bluesky --model_name TGAT --num_runs 1 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_neighbors 64 --num_layers 1 --num_heads 2
+python train_link_prediction.py --dataset_name bluesky --model_name TGAT --num_runs 1 --gpu 0 --batch_size 256 --negative_sample_strategy historical --num_epochs 50 --num_neighbors 8 --num_layers 2 --num_heads 2 --seed 42
 ```
 
 #### Model Evaluation
 * Evaluating *GraphRec* with posts that received at least one like in the last 20 minutes as candidate generation on *Bluesky* dataset:
 ```{bash}
-python evaluate_link_prediction.py --dataset_name bluesky --model_name GraphRec --patch_size 2 --max_input_sequence_length 64 --negative_sample_strategy real --num_runs 1 --gpu 0 --batch_size 4
+python evaluate_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 2 --max_input_sequence_length 64 --num_runs 1 --gpu 0 --batch_size 4 --negative_sample_strategy real --num_heads 2 --seed 42
 ```
 
 * Evaluating *TGAT* with posts that received at least one like in the last 20 minutes as candidate generation on *Bluesky* dataset:
 ```{bash}
-python evaluate_link_prediction.py --dataset_name bluesky --model_name TGAT --negative_sample_strategy real --num_runs 1 --gpu 0 --batch_size 4 --num_neighbors 64 --num_layers 1 --num_heads 2
+python evaluate_link_prediction.py --dataset_name bluesky --model_name TGAT --num_runs 1 --gpu 0 --batch_size 4 --negative_sample_strategy real --num_neighbors 8 --num_layers 2 --num_heads 2 --seed 42
 ```
 
 ## Acknowledgments
@@ -90,16 +90,3 @@ We are grateful to the authors of
   year={2023}
 }
 ```
-python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMulti --patch_size 2 --max_input_sequence_length 64 --num_runs 1 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2 --seed 2000
-
-python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 2 --max_input_sequence_length 64 --num_runs 1 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2 --seed 42
-
-python train_link_prediction.py --dataset_name bluesky --model_name GraphRec --patch_size 2 --max_input_sequence_length 64 --num_runs 1 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 4 --seed 42
-
-python train_link_prediction.py --dataset_name bluesky --model_name TGAT --num_runs 1 --gpu 0 --batch_size 256 --negative_sample_strategy historical --num_epochs 50 --num_neighbors 4 --num_layers 3 --num_heads 2 --seed 42
-
-python evaluate_link_prediction.py --dataset_name bluesky --model_name TGAT --num_runs 1 --gpu 0 --batch_size 4 --negative_sample_strategy real --gpu 0 --num_neighbors 8 --num_layers 2 --num_heads 2 --seed 2025
-
-python evaluate_link_prediction.py --dataset_name bluesky --model_name GraphRecMulti --patch_size 2 --max_input_sequence_length 64 --num_runs 1 --gpu 0 --batch_size 4 --negative_sample_strategy real --gpu 0 --num_heads 2 --seed 2000
-
-python evaluate_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 2 --max_input_sequence_length 64 --num_runs 1 --gpu 0 --batch_size 4 --negative_sample_strategy real --gpu 0 --num_heads 2 --seed 42
