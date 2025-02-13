@@ -54,6 +54,7 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
             
             popularity_based = False  # TODO make this as an argument
             if popularity_based:
+                model_name = 'Popularity'
                 candidates_dict = evaluate_neg_edge_sampler.sample(
                     len(batch_src_node_ids), 
                     batch_src_node_ids, 
@@ -72,7 +73,8 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                     else:
                         reciprocal_rank = 0.0  # True ID not in candidates
         
-                    mrr_results.append(reciprocal_rank)                
+                    mrr_results.append(reciprocal_rank)
+                    recommended_posts.append(candidates.tolist())
             else:
                 candidates_dict = evaluate_neg_edge_sampler.sample(
                     len(batch_src_node_ids), 
@@ -109,7 +111,7 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                 batch_src_ids = np.concatenate(batch_src_ids)
                 batch_idx = np.concatenate(batch_idx)
 
-                if model_name == 'GraphRec':
+                if model_name == 'GraphRec' or model_name == 'GraphRecMulti' or model_name == 'GraphRecMultiCo':
                     # Compute embeddings in one operation
                     # TODO need to optimize this part
                     src_embeddings, dst_embeddings = model[0].compute_src_dst_node_temporal_embeddings(
@@ -228,7 +230,7 @@ def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_s
     assert evaluate_neg_edge_sampler.seed is not None
     evaluate_neg_edge_sampler.reset_random_state()
 
-    if model_name in ['GraphRec', 'TGAT', 'CAWN']:
+    if model_name in ['GraphRec', 'TGAT', 'GraphRecMulti', 'GraphRecMultiCo']:
         # evaluation phase use all the graph information
         model[0].set_neighbor_sampler(neighbor_sampler)
 
@@ -262,7 +264,7 @@ def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_s
 
             # we need to compute for positive and negative edges respectively, because the new sampling strategy (for evaluation) allows the negative source nodes to be
             # different from the source nodes, this is different from previous works that just replace destination nodes with negative destination nodes
-            if model_name in ['GraphRec']:
+            if model_name in ['GraphRec', 'GraphRecMulti', 'GraphRecMultiCo']:
                 # get temporal embedding of source and destination nodes
                 # two Tensors, with shape (batch_size, node_feat_dim)
                 batch_src_node_embeddings, batch_dst_node_embeddings = \

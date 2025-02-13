@@ -9,6 +9,8 @@ import torch.nn as nn
 
 from models.TGAT import TGAT
 from models.GraphRec import GraphRec
+from models.GraphRecMulti import GraphRecMulti
+from models.GraphRecMultiCo import GraphRecMultiCo
 from models.modules import MergeLayer
 from utils.utils import set_random_seed, convert_to_gpu, get_parameter_sizes
 from utils.utils import get_neighbor_sampler, NegativeEdgeSampler, CandidateEdgeSampler
@@ -82,6 +84,16 @@ if __name__ == "__main__":
         # create model
         if args.model_name == 'GraphRec':
             dynamic_backbone = GraphRec(node_raw_features=node_raw_features, neighbor_sampler=full_neighbor_sampler,
+                                            time_feat_dim=args.time_feat_dim, channel_embedding_dim=args.channel_embedding_dim, patch_size=args.patch_size,
+                                            num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout,
+                                            max_input_sequence_length=args.max_input_sequence_length, device=args.device, user_dynamic_features=dynamic_user_features, src_max_id=eval_test_data.src_max_id)
+        elif args.model_name == 'GraphRecMulti':
+            dynamic_backbone = GraphRecMulti(node_raw_features=node_raw_features, neighbor_sampler=full_neighbor_sampler,
+                                            time_feat_dim=args.time_feat_dim, channel_embedding_dim=args.channel_embedding_dim, patch_size=args.patch_size,
+                                            num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout,
+                                            max_input_sequence_length=args.max_input_sequence_length, device=args.device, user_dynamic_features=dynamic_user_features, src_max_id=eval_test_data.src_max_id)
+        elif args.model_name == 'GraphRecMultiCo':
+            dynamic_backbone = GraphRecMultiCo(node_raw_features=node_raw_features, neighbor_sampler=full_neighbor_sampler,
                                             time_feat_dim=args.time_feat_dim, channel_embedding_dim=args.channel_embedding_dim, patch_size=args.patch_size,
                                             num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout,
                                             max_input_sequence_length=args.max_input_sequence_length, device=args.device, user_dynamic_features=dynamic_user_features, src_max_id=eval_test_data.src_max_id)

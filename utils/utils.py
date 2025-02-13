@@ -729,21 +729,17 @@ class MultipleNegativeEdgeSampler(object):
         :param current_batch_start_time: float, start time in the current batch
         :param current_batch_end_time: float, end time in the current batch
         :return:
-        """
+        """        
         assert self.seed is not None
 
         original_batch_size = size
         size = 4 * size
-        
         time_20_min_before_start = current_batch_start_time[0] - 60*20  # (time is in sec)
         
         # Get historical edges in the past 20 minutes
         historical_edges = self.get_unique_edges_between_start_end_time(
             start_time=time_20_min_before_start, end_time=current_batch_start_time[0]
         )
-        
-        # get historical edges up to current_batch_start_time
-        # historical_edges = self.get_unique_edges_between_start_end_time(start_time=self.earliest_time, end_time=current_batch_start_time)
         # get edges in the current batch
         current_batch_edges = self.get_unique_edges_between_start_end_time(start_time=current_batch_start_time[0], end_time=current_batch_start_time[-1])
         # get source and destination node ids of unique historical edges
