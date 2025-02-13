@@ -148,6 +148,8 @@ candidates_length_histogram.png
 
 random_tests
 lightgcn
-*.ipynb
 
 .cursorrules
+
+.env.local
+
