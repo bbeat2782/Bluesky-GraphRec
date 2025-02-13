@@ -151,3 +151,6 @@ lightgcn
 *.ipynb
 
 .cursorrules
+
+**/recommended_posts.json
+
