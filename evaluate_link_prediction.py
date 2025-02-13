@@ -96,7 +96,8 @@ if __name__ == "__main__":
             dynamic_backbone = GraphRecMultiCo(node_raw_features=node_raw_features, neighbor_sampler=full_neighbor_sampler,
                                             time_feat_dim=args.time_feat_dim, channel_embedding_dim=args.channel_embedding_dim, patch_size=args.patch_size,
                                             num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout,
-                                            max_input_sequence_length=args.max_input_sequence_length, device=args.device, user_dynamic_features=dynamic_user_features, src_max_id=eval_test_data.src_max_id)
+                                            max_input_sequence_length=args.max_input_sequence_length, device=args.device, user_dynamic_features=dynamic_user_features,
+                                            src_max_id=eval_test_data.src_max_id, walk_length=args.walk_length, num_neighbors=args.num_neighbors)
         elif args.model_name == 'TGAT':
             dynamic_backbone = TGAT(node_raw_features=node_raw_features, edge_raw_features=edge_raw_features, neighbor_sampler=full_neighbor_sampler,
                                     time_feat_dim=args.time_feat_dim, num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout, device=args.device)
@@ -127,8 +128,7 @@ if __name__ == "__main__":
                                 evaluate_idx_data_loader=test_idx_data_loader,
                                 evaluate_neg_edge_sampler=new_node_test_neg_edge_sampler,
                                 evaluate_data=eval_test_data,
-                                num_neighbors=args.num_neighbors,
-                                time_gap=args.time_gap)
+                                num_neighbors=args.num_neighbors)
         
         # store the evaluation metrics at the current run
         new_node_test_metric_dict = {}

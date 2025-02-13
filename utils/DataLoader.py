@@ -3,6 +3,7 @@ import numpy as np
 import random
 import pandas as pd
 import pickle
+from datetime import datetime
 
 
 class CustomizedDataset(Dataset):
@@ -102,11 +103,14 @@ def get_link_prediction_data(dataset_name: str, val_ratio: float, test_ratio: fl
     
     # get the timestamp of validate and test set
     val_time, test_time = list(np.quantile(graph_df.ts, [(1 - val_ratio - test_ratio), (1 - test_ratio)]))
+
+    print('val_time:', datetime.utcfromtimestamp(val_time).strftime('%Y-%m-%d %H:%M:%S'))
+    print('test_time:', datetime.utcfromtimestamp(test_time).strftime('%Y-%m-%d %H:%M:%S'))
   
     src_node_ids = graph_df.u.values.astype(np.int32)
     dst_node_ids = graph_df.i.values.astype(np.int32)
     edge_ids = graph_df.idx.values.astype(np.int32)
-    node_interact_times = graph_df.ts.values.astype(np.float64)  # added
+    node_interact_times = graph_df.ts.values.astype(np.float64)
     labels = graph_df.label.values.astype(np.int8)
     idx = graph_df.idx.values.astype(np.int32)
     src_max_id = np.max(src_node_ids)
@@ -227,13 +231,12 @@ def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_rati
     # get the timestamp of validate and test set
     val_time, test_time = list(np.quantile(graph_df.ts, [(1 - val_ratio - test_ratio), (1 - test_ratio)]))
 
-    # TODO change to human readable format
-    print('val_time:', val_time)
-    print('test_time:', test_time)
+    print('val_time:', datetime.utcfromtimestamp(val_time).strftime('%Y-%m-%d %H:%M:%S'))
+    print('test_time:', datetime.utcfromtimestamp(test_time).strftime('%Y-%m-%d %H:%M:%S'))
 
     src_node_ids = graph_df.u.values.astype(np.longlong)
     dst_node_ids = graph_df.i.values.astype(np.longlong)
-    node_interact_times = graph_df.ts.values.astype(np.float64)  # added
+    node_interact_times = graph_df.ts.values.astype(np.float64)
     edge_ids = graph_df.idx.values.astype(np.longlong)
     labels = graph_df.label.values
     idx = graph_df.idx.values
@@ -291,7 +294,7 @@ def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_rati
     filtered_idx = idx[val_mask]
 
     
-    length_restrict = int(0.1 * len(filtered_src_node_ids))
+    length_restrict = int(0.001 * len(filtered_src_node_ids))
 
     interactions_df = pd.DataFrame({
         'src_node_id': filtered_src_node_ids[:length_restrict],
