@@ -5,5 +5,6 @@ temporal graph:
 temporal embedding:
 channel: node?, time?
 patch: 
+
 sampling temporal neighbors: get all posts with interaction timestamps 20 minutes before the current interaction? is that it?
-raw: static feature; only post -> text embeddings
+
