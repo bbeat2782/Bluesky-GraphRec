@@ -12,28 +12,25 @@ import matplotlib.pyplot as plt
 
 from utils.metrics import get_link_prediction_metrics
 from utils.utils import set_random_seed
-from utils.utils import NegativeEdgeSampler, NeighborSampler
+from utils.utils import NeighborSampler
 from utils.DataLoader import Data
 
 
 def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborSampler, evaluate_idx_data_loader: DataLoader,
                                    evaluate_neg_edge_sampler, evaluate_data: Data,
-                                   num_neighbors: int = 20, time_gap: int = 2000):
+                                   num_neighbors: int = 20):
     """
     evaluate models on the link prediction task
     :param model_name: str, name of the model
     :param model: nn.Module, the model to be evaluated
     :param neighbor_sampler: NeighborSampler, neighbor sampler
     :param evaluate_idx_data_loader: DataLoader, evaluate index data loader
-    :param evaluate_neg_edge_sampler: NegativeEdgeSampler, evaluate negative edge sampler
+    :param evaluate_neg_edge_sampler: CandidateEdgeSampler, evaluate candidate edge sampler
     :param evaluate_data: Data, data to be evaluated
-    :param loss_func: nn.Module, loss function
     :param num_neighbors: int, number of neighbors to sample for each node
-    :param time_gap: int, time gap for neighbors to compute node features
     :return:
     """
     # Ensures the random sampler uses a fixed seed for evaluation (i.e. we always sample the same negatives for validation / test set)
-    #evaluate_neg_edge_sampler.reset_random_state()
 
     model[0].set_neighbor_sampler(neighbor_sampler)
     model.eval()
@@ -54,6 +51,7 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
             
             popularity_based = False  # TODO make this as an argument
             if popularity_based:
+                model_name = 'Popularity'
                 candidates_dict = evaluate_neg_edge_sampler.sample(
                     len(batch_src_node_ids), 
                     batch_src_node_ids, 
@@ -72,7 +70,8 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                     else:
                         reciprocal_rank = 0.0  # True ID not in candidates
         
-                    mrr_results.append(reciprocal_rank)                
+                    mrr_results.append(reciprocal_rank)
+                    recommended_posts.append(candidates.tolist())
             else:
                 candidates_dict = evaluate_neg_edge_sampler.sample(
                     len(batch_src_node_ids), 
@@ -109,9 +108,8 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                 batch_src_ids = np.concatenate(batch_src_ids)
                 batch_idx = np.concatenate(batch_idx)
 
-                if model_name == 'GraphRec':
+                if model_name in {'GraphRec', 'GraphRecMulti', 'GraphRecMultiCo'}:
                     # Compute embeddings in one operation
-                    # TODO need to optimize this part
                     src_embeddings, dst_embeddings = model[0].compute_src_dst_node_temporal_embeddings(
                         src_node_ids=batch_src_ids,
                         dst_node_ids=batch_candidates,
@@ -120,7 +118,6 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                     )
                 elif model_name == 'TGAT':
                     # Compute embeddings in one operation
-                    # TODO need to optimize this part
                     src_embeddings, dst_embeddings = model[0].compute_src_dst_node_temporal_embeddings(
                         src_node_ids=batch_src_ids,
                         dst_node_ids=batch_candidates,
@@ -156,13 +153,11 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                         # True destination not found in candidates
                         mrr_results.append(0)
 
-
                     # NOTE: For checking which posts are recommended. Comment this when you do not need it
                     # Sort indices based on probabilities in descending order
                     sorted_indices = np.argsort(-post_probabilities)  # Negative sign for descending order
                 
                     # Apply sorted indices to both arrays
-                    #sorted_probabilities = post_probabilities[sorted_indices]
                     sorted_candidates = post_candidates[sorted_indices]
 
                     recommended_posts.append(sorted_candidates.tolist()) 
@@ -177,8 +172,6 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
     with open(save_path, "w") as json_file:
         json.dump(recommended_posts, json_file, indent=4)
 
-    #################################################################################
-    
     np.save(f"saved_results/{model_name}/bluesky/mrr_results.npy", np.array(mrr_results))
     avg_mrr = sum(mrr_results) / len(mrr_results)
     
@@ -209,26 +202,24 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
 
 
 def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_sampler: NeighborSampler, evaluate_idx_data_loader: DataLoader,
-                                   evaluate_neg_edge_sampler: NegativeEdgeSampler, evaluate_data: Data, loss_func: nn.Module,
-                                   num_neighbors: int = 20, time_gap: int = 2000):
+                                   evaluate_neg_edge_sampler, evaluate_data: Data,
+                                   num_neighbors: int = 20):
     """
     evaluate models on the link prediction task
     :param model_name: str, name of the model
     :param model: nn.Module, the model to be evaluated
     :param neighbor_sampler: NeighborSampler, neighbor sampler
     :param evaluate_idx_data_loader: DataLoader, evaluate index data loader
-    :param evaluate_neg_edge_sampler: NegativeEdgeSampler, evaluate negative edge sampler
+    :param evaluate_neg_edge_sampler: MultipleNegativeEdgeSampler, evaluate negative edge sampler
     :param evaluate_data: Data, data to be evaluated
-    :param loss_func: nn.Module, loss function
     :param num_neighbors: int, number of neighbors to sample for each node
-    :param time_gap: int, time gap for neighbors to compute node features
     :return:
     """
     # Ensures the random sampler uses a fixed seed for evaluation (i.e. we always sample the same negatives for validation / test set)
     assert evaluate_neg_edge_sampler.seed is not None
     evaluate_neg_edge_sampler.reset_random_state()
 
-    if model_name in ['GraphRec', 'TGAT', 'CAWN']:
+    if model_name in ['GraphRec', 'TGAT', 'GraphRecMulti', 'GraphRecMultiCo']:
         # evaluation phase use all the graph information
         model[0].set_neighbor_sampler(neighbor_sampler)
 
@@ -262,7 +253,7 @@ def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_s
 
             # we need to compute for positive and negative edges respectively, because the new sampling strategy (for evaluation) allows the negative source nodes to be
             # different from the source nodes, this is different from previous works that just replace destination nodes with negative destination nodes
-            if model_name in ['GraphRec']:
+            if model_name in ['GraphRec', 'GraphRecMulti', 'GraphRecMultiCo']:
                 # get temporal embedding of source and destination nodes
                 # two Tensors, with shape (batch_size, node_feat_dim)
                 batch_src_node_embeddings, batch_dst_node_embeddings = \
@@ -330,21 +321,12 @@ def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_s
                 input_1=batch_neg_src_node_embeddings_flat, 
                 input_2=batch_neg_dst_node_embeddings_flat
             ).squeeze(dim=-1).view(positive_scores.shape[0], 4)  # Reshape back to (batch_size, 4)
-            
-            # # get positive and negative probabilities, shape (batch_size, )
-            # positive_probabilities = model[1](input_1=batch_src_node_embeddings, input_2=batch_dst_node_embeddings).squeeze(dim=-1).sigmoid()
-            # negative_probabilities = model[1](input_1=batch_neg_src_node_embeddings, input_2=batch_neg_dst_node_embeddings).squeeze(dim=-1).sigmoid()
 
             # Apply BPR loss: Maximize positive score over all negatives
             bpr_loss = -torch.log(torch.sigmoid(positive_scores.unsqueeze(1) - negative_scores) + 1e-8).mean()
 
             predicts = torch.cat([positive_scores.unsqueeze(1), negative_scores], dim=1)  # (batch_size, 5)
             labels = torch.cat([torch.ones(positive_scores.shape[0], 1), torch.zeros(positive_scores.shape[0], 4)], dim=1)
-
-            #predicts = torch.cat([positive_probabilities, negative_probabilities], dim=0)
-            #labels = torch.cat([torch.ones_like(positive_probabilities), torch.zeros_like(negative_probabilities)], dim=0)
-
-            #loss = loss_func(input=predicts, target=labels)
 
             evaluate_losses.append(bpr_loss.item())
 

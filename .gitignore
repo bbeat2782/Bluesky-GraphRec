@@ -152,3 +152,5 @@ lightgcn
 .cursorrules
 
 .env.local
+
+**/recommended_posts.json

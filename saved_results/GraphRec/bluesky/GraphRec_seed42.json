@@ -1,0 +1,18 @@
+{
+    "validate metrics": {
+        "accuracy": "0.6628",
+        "pairwise_acc": "0.8783"
+    },
+    "new node validate metrics": {
+        "accuracy": "0.6631",
+        "pairwise_acc": "0.8783"
+    },
+    "test metrics": {
+        "accuracy": "0.6683",
+        "pairwise_acc": "0.8824"
+    },
+    "new node test metrics": {
+        "accuracy": "0.6688",
+        "pairwise_acc": "0.8827"
+    }
+}
