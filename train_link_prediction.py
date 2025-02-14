@@ -17,7 +17,7 @@ from models.GraphRecMulti import GraphRecMulti
 from models.GraphRecMultiCo import GraphRecMultiCo
 from models.modules import MergeLayer
 from utils.utils import set_random_seed, convert_to_gpu, get_parameter_sizes, create_optimizer, save_plot
-from utils.utils import get_neighbor_sampler, NegativeEdgeSampler, MultipleNegativeEdgeSampler
+from utils.utils import get_neighbor_sampler, MultipleNegativeEdgeSampler
 from evaluate_models_utils import evaluate_model_link_prediction
 from utils.metrics import get_link_prediction_metrics
 from utils.DataLoader import get_idx_data_loader, get_link_prediction_data
