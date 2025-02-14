@@ -1,0 +1,61 @@
+=== Final Dataset Splits ===
+
+Full Dataset:
+num_interactions: 22131398
+num_unique_nodes: 5972593
+First 5 src_node_ids: [12249 50948 24219 13744 50948]
+First 5 dst_node_ids: [ 107717 3150865 2454231  107717  107717]
+First 5 node_interact_times: [1.67254100e+09 1.67254139e+09 1.67254512e+09 1.67255022e+09
+ 1.67255130e+09]
+First 5 labels: [0 0 0 0 0]
+
+
+Train Dataset:
+num_interactions: 10427384
+num_unique_nodes: 3491300
+First 5 src_node_ids: [24219 95618 24219 65607 95618]
+First 5 dst_node_ids: [2454231 4373025 1689366 1689366 5542542]
+First 5 node_interact_times: [1.67254512e+09 1.67255310e+09 1.67255602e+09 1.67255802e+09
+ 1.67256303e+09]
+First 5 labels: [0 0 0 0 0]
+
+
+Val Dataset:
+num_interactions: 3319708
+num_unique_nodes: 914532
+First 5 src_node_ids: [44910 19538 80478 94696 77186]
+First 5 dst_node_ids: [ 973571 2180524 1444817 2818506 4504621]
+First 5 node_interact_times: [1.68676471e+09 1.68676471e+09 1.68676471e+09 1.68676471e+09
+ 1.68676471e+09]
+First 5 labels: [0 0 0 0 0]
+
+
+Test Dataset:
+num_interactions: 3319709
+num_unique_nodes: 926555
+First 5 src_node_ids: [94472 93516 42856 36277 23514]
+First 5 dst_node_ids: [ 948715 1081594 3503783  410227 2422278]
+First 5 node_interact_times: [1.68754965e+09 1.68754965e+09 1.68754965e+09 1.68754965e+09
+ 1.68754965e+09]
+First 5 labels: [0 0 0 0 0]
+
+
+New Node Val Dataset:
+num_interactions: 3290159
+num_unique_nodes: 904424
+First 5 src_node_ids: [ 19538  77186  16893 104095  12784]
+First 5 dst_node_ids: [2180524 4504621 1923935 5867508  146827]
+First 5 node_interact_times: [1.68676471e+09 1.68676471e+09 1.68676471e+09 1.68676471e+09
+ 1.68676471e+09]
+First 5 labels: [0 0 0 0 0]
+
+
+New Node Test Dataset:
+num_interactions: 3312255
+num_unique_nodes: 924021
+First 5 src_node_ids: [94472 93516 42856 36277 23514]
+First 5 dst_node_ids: [ 948715 1081594 3503783  410227 2422278]
+First 5 node_interact_times: [1.68754965e+09 1.68754965e+09 1.68754965e+09 1.68754965e+09
+ 1.68754965e+09]
+First 5 labels: [0 0 0 0 0]
+

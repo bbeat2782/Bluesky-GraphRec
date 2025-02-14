@@ -324,6 +324,10 @@ def get_neighbor_sampler(data: Data, sample_neighbor_strategy: str = 'uniform', 
         adj_list[src_node_id].append((dst_node_id, edge_id, node_interact_time, interaction_idx))
         adj_list[dst_node_id].append((src_node_id, edge_id, node_interact_time, interaction_idx))
 
+    # Output raw adj_list to file
+    with open('adjacency_list_raw.txt', 'w') as f:
+        f.write(str(adj_list[:100]))
+
     return NeighborSampler(adj_list=adj_list, sample_neighbor_strategy=sample_neighbor_strategy, time_scaling_factor=time_scaling_factor, seed=seed)
 
 
@@ -683,6 +687,7 @@ class MultipleNegativeEdgeSampler(object):
                                                                                  current_batch_end_time=current_batch_end_time)
         else:
             raise ValueError(f'Not implemented error for negative_sample_strategy {self.negative_sample_strategy}!')
+
         return negative_src_node_ids, negative_dst_node_ids
 
     def random_sample(self, size: int):

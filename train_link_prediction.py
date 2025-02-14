@@ -44,6 +44,17 @@ if __name__ == "__main__":
     # initialize validation and test neighbor sampler to retrieve temporal graph
     full_neighbor_sampler = get_neighbor_sampler(data=full_data, sample_neighbor_strategy=args.sample_neighbor_strategy,
                                                  time_scaling_factor=args.time_scaling_factor, seed=1)
+    
+    # # Write neighbor sampler data to file
+    # with open('neighbor_sampler_data.txt', 'w') as f:
+    #     f.write("\n\nFirst 5 entries of neighbor IDs:\n") 
+    #     f.write(str(train_neighbor_sampler.nodes_neighbor_ids[:5]))
+    #     f.write("\n\nFirst 5 entries of edge IDs:\n")
+    #     f.write(str(train_neighbor_sampler.nodes_edge_ids[:5]))
+    #     f.write("\n\nFirst 5 entries of neighbor timestamps:\n")
+    #     f.write(str(train_neighbor_sampler.nodes_neighbor_times[:5]))
+    #     f.write("\n\nFirst 5 entries of neighbor indices:\n")
+    #     f.write(str(train_neighbor_sampler.nodes_neighbor_idx[:5]))
 
     # initialize negative samplers, set seeds for validation and testing so negatives are the same across different runs
     train_neg_edge_sampler = MultipleNegativeEdgeSampler(src_node_ids=train_data.src_node_ids, dst_node_ids=train_data.dst_node_ids, seed=2025, negative_sample_strategy=args.negative_sample_strategy, interact_times=train_data.node_interact_times)
@@ -53,11 +64,36 @@ if __name__ == "__main__":
     new_node_test_neg_edge_sampler = MultipleNegativeEdgeSampler(src_node_ids=new_node_test_data.src_node_ids, dst_node_ids=new_node_test_data.dst_node_ids, seed=3, negative_sample_strategy=args.negative_sample_strategy, interact_times=new_node_test_data.node_interact_times)
 
     # get data loaders
+    # Create data loaders
     train_idx_data_loader = get_idx_data_loader(indices_list=list(range(len(train_data.src_node_ids))), batch_size=args.batch_size, shuffle=False)
     val_idx_data_loader = get_idx_data_loader(indices_list=list(range(len(val_data.src_node_ids))), batch_size=args.batch_size, shuffle=False)
     new_node_val_idx_data_loader = get_idx_data_loader(indices_list=list(range(len(new_node_val_data.src_node_ids))), batch_size=args.batch_size, shuffle=False)
     test_idx_data_loader = get_idx_data_loader(indices_list=list(range(len(test_data.src_node_ids))), batch_size=args.batch_size, shuffle=False)
     new_node_test_idx_data_loader = get_idx_data_loader(indices_list=list(range(len(new_node_test_data.src_node_ids))), batch_size=args.batch_size, shuffle=False)
+
+    # Write example data to file
+    with open('dataloader_examples.txt', 'w') as f:
+        f.write("=== Example data from dataloaders ===\n\n")
+        
+        # Write training data examples
+        f.write("Training data examples:\n")
+        f.write(f"Number of training interactions: {len(train_data.src_node_ids)}\n")
+        
+        # Write first example with sample data
+        f.write("\nExample 1:\n")
+        f.write(f"Source node ID: {train_data.src_node_ids[0]}\n")
+        f.write(f"Destination node ID: {train_data.dst_node_ids[0]}\n") 
+        f.write(f"Interaction time: {train_data.node_interact_times[0]}\n")
+        f.write(f"Edge ID: {train_data.edge_ids[0]}\n")
+        f.write(f"Label: {train_data.labels[0]}\n")
+        f.write(f"Index: {train_data.idx[0]}\n")
+        f.write(f"Total number of interactions: {train_data.num_interactions}\n")
+        f.write(f"Number of unique nodes: {train_data.num_unique_nodes}\n")
+        f.write(f"Maximum source node ID: {train_data.src_max_id}\n")
+
+        # Write batch info
+        f.write(f"\nBatch size: {args.batch_size}\n")
+        f.write(f"Number of batches in training: {len(train_idx_data_loader)}\n")
 
     val_metric_all_runs, new_node_val_metric_all_runs, test_metric_all_runs, new_node_test_metric_all_runs = [], [], [], []
 
@@ -156,8 +192,35 @@ if __name__ == "__main__":
                 # For dynamic features
                 batch_src_idx = train_data.idx[train_data_indices]
 
+                # # Save sample data to file for inspection
+                # if batch_idx == start_batch:  # Only save first batch
+                #     # Create table with headers and data
+                #     headers = ['src_node', 'dst_node', 'timestamp', 'edge_id', 'src_idx']
+                #     data = np.column_stack((
+                #         batch_src_node_ids[:5],
+                #         batch_dst_node_ids[:5], 
+                #         batch_node_interact_times[:5],
+                #         batch_edge_ids[:5],
+                #         batch_src_idx[:5]
+                #     ))
+                    
+                #     with open('sample_data.txt', 'w') as f:
+                #         # Write headers
+                #         f.write('\t'.join(headers) + '\n')
+                #         # Write data rows
+                #         np.savetxt(f, data, fmt='%d', delimiter='\t')
+                #         f.write('\nhead=5\n\n')
+                #         f.write('sample_source_indices:\n')
+                #         f.write(str(batch_src_idx[:10]) + '\n\n')
+
                 # batch_neg_dst_node_ids.shape: (batch_size, 4)
                 _, batch_neg_dst_node_ids = train_neg_edge_sampler.sample(size=len(batch_src_node_ids), current_batch_start_time=batch_node_interact_times)
+
+                # Log negative samples info
+                with open('sample_negative_data.txt', 'a') as f:
+                    f.write(f' batch_neg_dst_node_ids.shape: {batch_neg_dst_node_ids.shape}\n')
+                    f.write('batch_neg_dst_node_ids: ')
+                    f.write(str(batch_neg_dst_node_ids[:5]) + '\n')
 
                 # batch_neg_src_node_ids = batch_src_node_ids
                 batch_neg_src_node_ids = np.repeat(batch_src_node_ids, 4, axis=0).reshape(len(batch_src_node_ids), 4)

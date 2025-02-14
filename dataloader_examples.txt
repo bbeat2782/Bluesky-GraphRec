@@ -1,0 +1,18 @@
+=== Example data from dataloaders ===
+
+Training data examples:
+Number of training interactions: 10427384
+
+Example 1:
+Source node ID: 24219
+Destination node ID: 2454231
+Interaction time: 1672545122.0
+Edge ID: 3
+Label: 0
+Index: 3
+Total number of interactions: 10427384
+Number of unique nodes: 3491300
+Maximum source node ID: 106367
+
+Batch size: 512
+Number of batches in training: 20366
