@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import normalize
 
+
 def factorize(coo_matrix, n_components=128, n_clusters=100, device='cuda'):
     """
     Factorize the input matrix using PyTorch's SVD implementation.
@@ -58,6 +59,7 @@ def factorize(coo_matrix, n_components=128, n_clusters=100, device='cuda'):
     producer_community_affinities = 1 - (assigned_distances / assigned_distances.max())
     
     return producer_communities, producer_community_affinities, consumer_embeddings_norm, producer_embeddings_norm, kmeans.cluster_centers_
+
 
 
 

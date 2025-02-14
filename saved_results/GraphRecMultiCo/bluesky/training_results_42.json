@@ -1,0 +1,29 @@
+{
+    "train_loss_history": [
+        0.31158592432342325
+    ],
+    "val_loss_history": [
+        0.2800199059519819
+    ],
+    "new_val_loss_history": [
+        0.2793596842750606
+    ],
+    "train_acc_history": [
+        0.712849380341475
+    ],
+    "val_acc_history": [
+        0.7234862119831914
+    ],
+    "new_val_acc_history": [
+        0.7245309165625328
+    ],
+    "train_pairwise_acc_history": [
+        0.8891932107563046
+    ],
+    "val_pairwise_acc_history": [
+        0.9029125932185051
+    ],
+    "new_val_pairwise_acc_history": [
+        0.9031318259276276
+    ]
+}
