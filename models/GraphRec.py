@@ -88,6 +88,37 @@ class GraphRec(nn.Module):
 
         self.output_layer = nn.Linear(in_features=self.num_channels * self.channel_embedding_dim, out_features=self.node_feat_dim, bias=True)
 
+        # After node_raw_features initialization
+        print("=== Node Raw Features ===", file=open('graphrec_debug.txt', 'w'))
+        print(f"Shape: {self.node_raw_features.shape}")
+        print(f"Example (first 3 nodes):\n{self.node_raw_features[:3]}\n", file=open('graphrec_debug.txt', 'a'))
+
+        # After extracting dates and users
+        print("=== Dates and Users ===", file=open('graphrec_debug.txt', 'a'))
+        print(f"Number of dates: {num_dates}")
+        print(f"First 5 dates: {all_dates[:5]}")
+        print(f"Number of users: {num_users}")
+        print(f"First 5 users: {all_users[:5]}\n", file=open('graphrec_debug.txt', 'a'))
+
+        # After creating index mappings
+        print("=== Index Mappings ===", file=open('graphrec_debug.txt', 'a'))
+        print(f"First 5 date mappings: {dict(list(date_to_index.items())[:5])}")
+        print(f"First 5 user mappings: {dict(list(user_to_index.items())[:5])}\n", file=open('graphrec_debug.txt', 'a'))
+
+        # After creating user_dynamic_tensor
+        print("=== User Dynamic Tensor ===", file=open('graphrec_debug.txt', 'a'))
+        print(f"Shape: {user_dynamic_tensor.shape}")
+        print(f"Example (first date, first 3 users):\n{user_dynamic_tensor[0, :3]}\n", file=open('graphrec_debug.txt', 'a'))
+
+        # After setting other parameters
+        print("=== Model Parameters ===", file=open('graphrec_debug.txt', 'a'))
+        print(f"node_feat_dim: {self.node_feat_dim}")
+        print(f"time_feat_dim: {self.time_feat_dim}")
+        print(f"channel_embedding_dim: {self.channel_embedding_dim}")
+        print(f"patch_size: {self.patch_size}")
+        print(f"max_input_sequence_length: {self.max_input_sequence_length}")
+        print(f"src_max_id: {self.src_max_id}", file=open('graphrec_debug.txt', 'a'))
+
     def compute_src_dst_node_temporal_embeddings(self, src_node_ids: np.ndarray, dst_node_ids: np.ndarray, node_interact_times: np.ndarray, batch_src_idx=None, is_eval=False):
         """
         compute source and destination node temporal embeddings

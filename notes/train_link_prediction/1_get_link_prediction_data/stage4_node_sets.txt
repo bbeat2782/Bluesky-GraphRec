@@ -1,0 +1,9 @@
+=== Node Sets ===
+num_total_unique_node_ids: 5972593
+len(test_node_set): 1760500
+Sorted Sample of Test Node Set (first 20):
+[np.int32(2), np.int32(3), np.int32(6), np.int32(7), np.int32(10), np.int32(13), np.int32(14), np.int32(17), np.int32(19), np.int32(20), np.int32(22), np.int32(23), np.int32(24), np.int32(26), np.int32(28), np.int32(29), np.int32(31), np.int32(33), np.int32(34), np.int32(35)]
+
+len(new_test_node_set): 597259
+Sorted Sample of New Test Node Set (first 20):
+[np.int32(2), np.int32(6), np.int32(10), np.int32(20), np.int32(28), np.int32(29), np.int32(33), np.int32(39), np.int32(40), np.int32(43), np.int32(48), np.int32(53), np.int32(55), np.int32(57), np.int32(60), np.int32(63), np.int32(68), np.int32(78), np.int32(84), np.int32(91)]
