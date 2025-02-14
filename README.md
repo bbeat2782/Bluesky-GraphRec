@@ -51,7 +51,7 @@ python preprocess_data.py  --dataset_name bluesky
 #### Model Training
 * Training *GraphRec* on *Bluesky* dataset:
 ```{bash}
-python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 2 --max_input_sequence_length 64 --num_runs 1 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2 --walk_length 2 --num_neighbors 8 --seed 42
+python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 2 --num_runs 1 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2 --walk_length 2 --num_neighbors 8 --seed 42
 ```
 
 * Training *TGAT* on *Bluesky* dataset:
@@ -62,7 +62,7 @@ python train_link_prediction.py --dataset_name bluesky --model_name TGAT --num_r
 #### Model Evaluation
 * Evaluating *GraphRec* with posts that received at least one like in the last 20 minutes as candidate generation on *Bluesky* dataset:
 ```{bash}
-python evaluate_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 2 --max_input_sequence_length 64 --num_runs 1 --gpu 0 --batch_size 4 --negative_sample_strategy real --num_heads 2 --walk_length 2 --num_neighbors 8 --seed 42
+python evaluate_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 2 --num_runs 1 --gpu 0 --batch_size 4 --negative_sample_strategy real --num_heads 2 --walk_length 2 --num_neighbors 8 --seed 42
 ```
 
 * Evaluating *TGAT* with posts that received at least one like in the last 20 minutes as candidate generation on *Bluesky* dataset:

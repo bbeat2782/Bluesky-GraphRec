@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 from utils.metrics import get_link_prediction_metrics
 from utils.utils import set_random_seed
-from utils.utils import NegativeEdgeSampler, NeighborSampler
+from utils.utils import NeighborSampler
 from utils.DataLoader import Data
 
 
@@ -25,7 +25,7 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
     :param model: nn.Module, the model to be evaluated
     :param neighbor_sampler: NeighborSampler, neighbor sampler
     :param evaluate_idx_data_loader: DataLoader, evaluate index data loader
-    :param evaluate_neg_edge_sampler: NegativeEdgeSampler, evaluate negative edge sampler
+    :param evaluate_neg_edge_sampler: CandidateEdgeSampler, evaluate candidate edge sampler
     :param evaluate_data: Data, data to be evaluated
     :param num_neighbors: int, number of neighbors to sample for each node
     :return:
@@ -202,7 +202,7 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
 
 
 def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_sampler: NeighborSampler, evaluate_idx_data_loader: DataLoader,
-                                   evaluate_neg_edge_sampler: NegativeEdgeSampler, evaluate_data: Data,
+                                   evaluate_neg_edge_sampler, evaluate_data: Data,
                                    num_neighbors: int = 20):
     """
     evaluate models on the link prediction task
@@ -210,7 +210,7 @@ def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_s
     :param model: nn.Module, the model to be evaluated
     :param neighbor_sampler: NeighborSampler, neighbor sampler
     :param evaluate_idx_data_loader: DataLoader, evaluate index data loader
-    :param evaluate_neg_edge_sampler: NegativeEdgeSampler, evaluate negative edge sampler
+    :param evaluate_neg_edge_sampler: MultipleNegativeEdgeSampler, evaluate negative edge sampler
     :param evaluate_data: Data, data to be evaluated
     :param num_neighbors: int, number of neighbors to sample for each node
     :return:
