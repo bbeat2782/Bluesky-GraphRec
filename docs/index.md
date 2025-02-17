@@ -1,17 +1,14 @@
 # Evaluating Graph Transformers for Scalable Social Media Recommendations
 
----
-
 ## Introduction
+
 ### What is the problem?
-
-
-
 ### Why is this important?
 
 ---
 
 ## Methods
+
 ### Overview
 We use a **two-stage recommendation pipeline**:
 1. **Candidate Generation**: Uses **collaborative filtering** and **consumer-producer embeddings** to efficiently generate a list of candidate posts for each user.
@@ -24,14 +21,20 @@ We use a **two-stage recommendation pipeline**:
 
 <iframe src="assets/producer_embeddings.html" width="800" height="600" frameBorder="0"></iframe>
 
-<iframe src="assets/pipeline1.svg" width="400" height="300" frameBorder="0"></iframe>
+<div style="width: 100%; display: flex; justify-content: center;">
+    <object type="image/svg+xml" data="assets/pipeline1.svg" style="width: 100%; max-height: 500px;"></object>
+</div>
 
-<iframe src="assets/pipeline2.svg" width="400" height="300" frameBorder="0"></iframe>
+<div style="width: 100%; display: flex; justify-content: center;">
+    <object type="image/svg+xml" data="assets/pipeline2.svg" style="width: 100%; max-height: 500px;"></object>
+</div>
+
 
 
 ---
 
 ## Evaluation & Metrics
+
 ### Key Metrics
 To evaluate our model, we focus on both **ranking quality** and **diversity**:
 - **Hit Rate@K**: Measures how often the correct post appears in the top-K recommendations.
@@ -66,6 +69,12 @@ To evaluate our model, we focus on both **ranking quality** and **diversity**:
 
 ## Acknowledgments
 
+We thank our mentors and the UCSD DSC Capstone Program for their guidance and support.  
+
 ---
 
 ## References
+
+[1] Yu, Le, Leilei Sun, Bowen Du, and Weifeng Lv. 2023.  
+*"Towards Better Dynamic Graph Learning: New Architecture and Unified Library."*  
+Available at: [arXiv:2303.13047](https://arxiv.org/abs/2303.13047).

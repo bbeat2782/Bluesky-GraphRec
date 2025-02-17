@@ -1,3 +1,35 @@
-remote_theme: pages-themes/cayman@v0.2.0
+remote_theme: just-the-docs/just-the-docs
 plugins:
-- jekyll-remote-theme # add this line to the plugins list if you already have one
+  - jekyll-remote-theme
+
+
+# nav:
+#   - Home: index.md
+#   - Introduction: index.md#introduction
+#   - Methods:
+#       - Overview: index.md#methods
+#       - Pipeline: index.md#pipeline
+#   - Evaluation & Metrics: index.md#evaluation-metrics
+#   - Results: index.md#results
+#   - Real-World Impact: index.md#real-world-impact
+#   - Future Work: index.md#future-work
+#   - Acknowledgments: index.md#acknowledgments
+#   - References: index.md#references
+
+# just_the_docs:
+#   show_toc: true
+#   has_children: true
+#   nav_order: 1
+
+
+  # - Methods:
+  #     - Overview: index.md#methods
+  #     - Pipeline: index.md#pipeline
+  # - Evaluation & Metrics: index.md#evaluation-metrics
+  # - Results:
+  #     - Model Performance Comparison: index.md#model-performance-comparison
+  #     - Rank vs. Popularity Visualization: index.md#rank-vs-popularity
+  # - Real-World Impact: index.md#real-world-impact
+  # - Future Work: index.md#future-work
+  # - Acknowledgments: index.md#acknowledgments
+  # - References: index.md#references
