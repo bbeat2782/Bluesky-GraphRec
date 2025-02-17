@@ -1,7 +1,5 @@
 # Evaluating Graph Transformers for Scalable Social Media Recommendations
 
-## Home
-
 ---
 
 ## Introduction
@@ -15,6 +13,12 @@
 ### Overview
 
 ### Pipeline
+
+[Producer Embeddings](assets/producer_embeddings.html)
+
+[Pipeline 1](assets/pipeline1.svg)
+
+[Pipeline 2](assets/pipeline2.svg)
 
 ---
 
