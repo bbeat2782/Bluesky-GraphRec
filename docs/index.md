@@ -14,11 +14,12 @@
 
 ### Pipeline
 
-[Producer Embeddings](assets/producer_embeddings.html)
+<iframe src="assets/producer_embeddings.html" width="800" height="600" frameBorder="0"></iframe>
 
-[Pipeline 1](assets/pipeline1.svg)
+<iframe src="assets/pipeline1.svg" width="800" height="600" frameBorder="0"></iframe>
 
-[Pipeline 2](assets/pipeline2.svg)
+<iframe src="assets/pipeline2.svg" width="800" height="600" frameBorder="0"></iframe>
+
 
 ---
 
