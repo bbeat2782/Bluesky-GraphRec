@@ -133,6 +133,7 @@ class NeighborSampler:
         if self.seed is not None:
             self.random_state = np.random.RandomState(self.seed)
 
+    # NOT USED
     def compute_sampled_probabilities(self, node_neighbor_times: np.ndarray):
         """
         compute the sampled probabilities of historical neighbors based on their interaction times
@@ -456,11 +457,11 @@ class MultipleNegativeEdgeSampler(object):
                                                                                   batch_dst_node_ids=batch_dst_node_ids,
                                                                                   current_batch_start_time=current_batch_start_time,
                                                                                   current_batch_end_time=current_batch_end_time)
-        elif self.negative_sample_strategy == 'inductive':
-            negative_src_node_ids, negative_dst_node_ids = self.inductive_sample(size=size, batch_src_node_ids=batch_src_node_ids,
-                                                                                 batch_dst_node_ids=batch_dst_node_ids,
-                                                                                 current_batch_start_time=current_batch_start_time,
-                                                                                 current_batch_end_time=current_batch_end_time)
+        # elif self.negative_sample_strategy == 'inductive':
+        #     negative_src_node_ids, negative_dst_node_ids = self.inductive_sample(size=size, batch_src_node_ids=batch_src_node_ids,
+        #                                                                          batch_dst_node_ids=batch_dst_node_ids,
+        #                                                                          current_batch_start_time=current_batch_start_time,
+        #                                                                          current_batch_end_time=current_batch_end_time)
         else:
             raise ValueError(f'Not implemented error for negative_sample_strategy {self.negative_sample_strategy}!')
 

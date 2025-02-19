@@ -12,3 +12,4 @@ Evaluate on val and test sets
 
 get metric results and plot
 
+time stored as second

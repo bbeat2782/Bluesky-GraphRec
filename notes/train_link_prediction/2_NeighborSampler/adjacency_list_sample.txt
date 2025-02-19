@@ -6,6 +6,11 @@ adj_list[3] = [(1, 101, 1672541000, 1)]  # node 3 connected to node 1
 adj_list[4] = [(1, 102, 1672542000, 2)]  # node 4 connected to node 1
 
 
+
+padding histories:
+
+
+
 neighbor, edge, time, index
 neighbor: ID of the connected node
 edge: unique identifier for this connection
