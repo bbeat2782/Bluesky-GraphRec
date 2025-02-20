@@ -100,7 +100,7 @@ if __name__ == "__main__":
                                             src_max_id=eval_test_data.src_max_id, walk_length=args.walk_length, num_neighbors=args.num_neighbors)
         elif args.model_name == 'TGAT':
             dynamic_backbone = TGAT(node_raw_features=node_raw_features, edge_raw_features=edge_raw_features, neighbor_sampler=full_neighbor_sampler,
-                                    time_feat_dim=args.time_feat_dim, num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout, device=args.device)
+                                    time_feat_dim=args.time_feat_dim, num_layers=args.num_layers, dropout=args.dropout, device=args.device)
         else:
             raise ValueError(f"Wrong value for model_name {args.model_name}!")
         link_predictor = MergeLayer(input_dim1=node_raw_features.shape[1], input_dim2=node_raw_features.shape[1],
@@ -128,7 +128,8 @@ if __name__ == "__main__":
                                 evaluate_idx_data_loader=test_idx_data_loader,
                                 evaluate_neg_edge_sampler=new_node_test_neg_edge_sampler,
                                 evaluate_data=eval_test_data,
-                                num_neighbors=args.num_neighbors)
+                                num_neighbors=args.num_neighbors,
+                                time_gap=args.time_gap)
         
         # store the evaluation metrics at the current run
         new_node_test_metric_dict = {}

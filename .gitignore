@@ -138,7 +138,6 @@ processed_data/*/*
 two_tower/data/*
 
 *.npy
-*.pkl
 
 # consumer-producer
 consumer-producer/*.json
