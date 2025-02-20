@@ -70,32 +70,32 @@ if __name__ == "__main__":
     test_idx_data_loader = get_idx_data_loader(indices_list=list(range(len(test_data.src_node_ids))), batch_size=args.batch_size, shuffle=False)
     new_node_test_idx_data_loader = get_idx_data_loader(indices_list=list(range(len(new_node_test_data.src_node_ids))), batch_size=args.batch_size, shuffle=False)
 
-    # Write example data to file
-    with open('dataloader_examples.txt', 'w') as f:
-        f.write("=== Example data from dataloaders ===\n\n")
+    # # Write example data to file
+    # with open('dataloader_examples.txt', 'w') as f:
+    #     f.write("=== Example data from dataloaders ===\n\n")
         
-        # Write training data examples
-        f.write("Training data examples:\n")
-        f.write(f"Number of training interactions: {len(train_data.src_node_ids)}\n")
+    #     # Write training data examples
+    #     f.write("Training data examples:\n")
+    #     f.write(f"Number of training interactions: {len(train_data.src_node_ids)}\n")
         
-        # Write first example with sample data
-        f.write("\nExample 1:\n")
-        f.write(f"Source node ID: {train_data.src_node_ids[0]}\n")
-        f.write(f"Destination node ID: {train_data.dst_node_ids[0]}\n") 
-        f.write(f"Interaction time: {train_data.node_interact_times[0]}\n")
-        f.write(f"Edge ID: {train_data.edge_ids[0]}\n")
-        f.write(f"Label: {train_data.labels[0]}\n")
-        f.write(f"Index: {train_data.idx[0]}\n")
-        f.write(f"Total number of interactions: {train_data.num_interactions}\n")
-        f.write(f"Number of unique nodes: {train_data.num_unique_nodes}\n")
-        f.write(f"Maximum source node ID: {train_data.src_max_id}\n")
+    #     # Write first example with sample data
+    #     f.write("\nExample 1:\n")
+    #     f.write(f"Source node ID: {train_data.src_node_ids[0]}\n")
+    #     f.write(f"Destination node ID: {train_data.dst_node_ids[0]}\n") 
+    #     f.write(f"Interaction time: {train_data.node_interact_times[0]}\n")
+    #     f.write(f"Edge ID: {train_data.edge_ids[0]}\n")
+    #     f.write(f"Label: {train_data.labels[0]}\n")
+    #     f.write(f"Index: {train_data.idx[0]}\n")
+    #     f.write(f"Total number of interactions: {train_data.num_interactions}\n")
+    #     f.write(f"Number of unique nodes: {train_data.num_unique_nodes}\n")
+    #     f.write(f"Maximum source node ID: {train_data.src_max_id}\n")
 
-        # Write batch info
-        f.write(f"\nBatch size: {args.batch_size}\n")
-        f.write(f"Number of batches in training: {len(train_idx_data_loader)}\n")
+    #     # Write batch info
+    #     f.write(f"\nBatch size: {args.batch_size}\n")
+    #     f.write(f"Number of batches in training: {len(train_idx_data_loader)}\n")
 
     val_metric_all_runs, new_node_val_metric_all_runs, test_metric_all_runs, new_node_test_metric_all_runs = [], [], [], []
-    print('args.time_gap', args.time_gap)
+
     for run in range(args.num_runs):
 
         set_random_seed(seed=run)
@@ -212,10 +212,10 @@ if __name__ == "__main__":
                 _, batch_neg_dst_node_ids = train_neg_edge_sampler.sample(size=len(batch_src_node_ids), current_batch_start_time=batch_node_interact_times)
 
                 # Log negative samples info
-                with open('sample_negative_data.txt', 'a') as f:
-                    f.write(f' batch_neg_dst_node_ids.shape: {batch_neg_dst_node_ids.shape}\n')
-                    f.write('batch_neg_dst_node_ids: ')
-                    f.write(str(batch_neg_dst_node_ids[:5]) + '\n')
+                # with open('sample_negative_data.txt', 'a') as f:
+                #     f.write(f' batch_neg_dst_node_ids.shape: {batch_neg_dst_node_ids.shape}\n')
+                #     f.write('batch_neg_dst_node_ids: ')
+                #     f.write(str(batch_neg_dst_node_ids[:5]) + '\n')
 
                 # batch_neg_src_node_ids = batch_src_node_ids
                 batch_neg_src_node_ids = np.repeat(batch_src_node_ids, 4, axis=0).reshape(len(batch_src_node_ids), 4)
