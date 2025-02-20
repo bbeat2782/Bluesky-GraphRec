@@ -18,7 +18,7 @@ from utils.DataLoader import Data
 
 def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborSampler, evaluate_idx_data_loader: DataLoader,
                                    evaluate_neg_edge_sampler, evaluate_data: Data,
-                                   num_neighbors: int = 20):
+                                   num_neighbors: int = 20, time_gap=8):
     """
     evaluate models on the link prediction task
     :param model_name: str, name of the model
@@ -93,6 +93,7 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                 batch_candidates = []
                 batch_interact_times = []
                 batch_src_ids = []
+                batch_src_ids_no_duplicates = []
                 batch_idx = []
     
                 for src_id, interact_time, src_idx in zip(batch_src_node_ids, batch_node_interact_times, batch_src_idx):
@@ -100,6 +101,7 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                     batch_candidates.append(list(candidate_ids))
                     batch_interact_times.append([interact_time] * len(candidate_ids))
                     batch_src_ids.append([src_id] * len(candidate_ids))
+                    batch_src_ids_no_duplicates.append(src_id)
                     batch_idx.append([src_idx] * len(candidate_ids))
     
                 # Flatten batch data for processing
@@ -124,6 +126,8 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                         node_interact_times=batch_interact_times,
                         num_neighbors=num_neighbors
                     )
+                else:
+                    raise ValueError(f"Wrong value for model_name {model_name}!")
     
                 # Compute scores for all user-candidate pairs in the batch
                 probabilities = model[1](input_1=src_embeddings, input_2=dst_embeddings).squeeze(dim=-1).sigmoid()
@@ -134,10 +138,15 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                 grouped_candidates = np.split(batch_candidates, split_indices)
     
                 # Evaluate MRR for each user in the batch
-                for post_probabilities, post_candidates, true_dst_id in zip(grouped_probabilities, grouped_candidates, batch_dst_node_ids):
+                for post_probabilities, post_candidates, true_dst_id, src_id in zip(grouped_probabilities, grouped_candidates, batch_dst_node_ids, batch_src_ids_no_duplicates):
                     # Convert to numpy for indexing
                     post_probabilities = np.array(post_probabilities)
                     post_candidates = np.array(post_candidates)
+
+                    # print('post_probabilities', post_probabilities.shape)
+                    # print('post_candidates', post_candidates.shape)
+                    # print('src_id', src_id)
+                    # raise ValueError()
                     
                     # Find the index of the true destination ID
                     true_dst_index = np.where(post_candidates == true_dst_id)[0]
@@ -203,7 +212,7 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
 
 def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_sampler: NeighborSampler, evaluate_idx_data_loader: DataLoader,
                                    evaluate_neg_edge_sampler, evaluate_data: Data,
-                                   num_neighbors: int = 20):
+                                   num_neighbors: int = 20, time_gap=2000):
     """
     evaluate models on the link prediction task
     :param model_name: str, name of the model
@@ -281,7 +290,7 @@ def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_s
                 node_feat_dim = batch_neg_src_node_embeddings.shape[1]  # Get feature dimension
                 batch_neg_src_node_embeddings = batch_neg_src_node_embeddings.reshape(len(batch_src_node_ids), 4, node_feat_dim)
                 batch_neg_dst_node_embeddings = batch_neg_dst_node_embeddings.reshape(len(batch_src_node_ids), 4, node_feat_dim)
-            elif model_name in ['TGAT', 'CAWN']:
+            elif model_name in ['TGAT']:
                 # get temporal embedding of source and destination nodes
                 # two Tensors, with shape (batch_size, node_feat_dim)
                 batch_src_node_embeddings, batch_dst_node_embeddings = \
