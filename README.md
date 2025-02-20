@@ -71,6 +71,11 @@ python evaluate_link_prediction.py --dataset_name bluesky --model_name GraphRecM
 python evaluate_link_prediction.py --dataset_name bluesky --model_name TGAT --num_runs 1 --gpu 0 --batch_size 4 --negative_sample_strategy real --num_neighbors 12 --num_layers 2 --num_heads 2 --seed 100
 ```
 
+## Ablation Study
+```{bash}
+python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 12 --num_runs 1 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2 --walk_length 2 --num_neighbors 12 --seed 50
+```
+
 ## Acknowledgments
 
 We are grateful to the authors of 

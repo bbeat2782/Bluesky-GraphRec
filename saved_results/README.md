@@ -1,3 +1,7 @@
+# Folders to check
+
+GraphRecMultiCo, Popularity, TGAT
+
 # Generated Files
 
 ## During Training
