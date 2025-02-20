@@ -1,0 +1,201 @@
+--------------------------------------------
+             DATA COLLECTION (Offline)
+--------------------------------------------
+  [Training Data: Interactions before 06-15]
+       |
+       v
++-----------------------------+
+| 1. Build Bipartite Graph    |
+|   (Consumers <--> Producers)  |
+|   - Input: Interactions data |
+|   - Output: Sparse COO Matrix|
++-----------------------------+
+       |
+       v
++-----------------------------+
+| 2. Matrix Factorization     |
+|   (SVD)                     |
+|   - Input: Sparse COO Matrix|
+|   - Parameters: n_components|
+|   - Output: Consumer Embeddings (fixed)|
+|             Producer Embeddings (fixed)|
++-----------------------------+
+       |
+       v
+    Consumer Embeddings (pt file)
+    Producer Profiles (parquet)
+--------------------------------------------
+             TEST PHASE (Online/Real-time Simulation)
+--------------------------------------------
+[Test Data: Posts from 06-15 (or 06-15 to 06-16)]
+       |
+       v
++-----------------------------+
+| 3. For each Test Post:       |
+|   - Input: Test Likes data  |
+|   - Collect Test Likes       |
+|   - Compute Post Embeddings  |
+|     (Aggregate likes)        |
+|     - Input: Test Likes     |
+|     - Output: Post Embeddings (dynamic)|
++-----------------------------+
+       |
+       v
++-----------------------------+
+| 4. Build FAISS Index        |
+|   - Input: Test Post Embeddings|
+|   - Parameters: GPU accel?   |
+|   - Output: FAISS Index    |
++-----------------------------+
+       |
+       v
++-----------------------------+
+| 5. For each Test Consumer:   |
+|   - Input: FAISS Index, Consumer Embeddings|
+|   - Retrieve fixed consumer  |
+|     embedding                |
+|   - Query FAISS for Top-K    |
+|     posts                    |
+|     - Input: Consumer Emb   |
+|     - Output: Top-K Post URIs|
++-----------------------------+
+       |
+       v
++-----------------------------+
+| 6. Evaluation              |
+|   - Input: Recommendations, Test Interactions|
+|   - Compare Recommendations vs. |
+|     Test Interactions           |
+|   - Compute Metrics (MRR, Recall etc)|
++-----------------------------+
+       |
+       v
+    Evaluation Results (Metrics)
+--------------------------------------------
+
+
+
+
+
+
+
+                                          ┌────────────────────────────┐
+                                          │     Data Files             │
+                                          │ ─ CSV (e.g., ml_bluesky.csv) │
+                                          │ ─ Numpy (.npy, .npz) files  │
+                                          └─────────────┬──────────────┘
+                                                        │
+                                                        │
+                                                        ▼
+                        ┌────────────────────────────────────────────┐
+                        │      get_link_prediction_data()            │
+                        │                                            │
+                        │   Read CSV & Features:                     │
+                        │     • src_node_ids, dst_node_ids            │
+                        │     • timestamps (ts), labels               │
+                        │     • node_raw_features, edge_raw_features   │
+                        │     • user_dynamic_features (from Pickle)   │
+                        │                                            │
+                        │   Compute time bounds (e.g., val_time,       │
+                        │   test_time via quantile calculations)       │
+                        │                                            │
+                        │   Split into:                              │
+                        │     • full_data, train_data,                │
+                        │       val_data, test_data, new_node_val_data, new_node_test_data│
+                        └─────────────┬──────────────────────────────┘
+                                      │
+                                      ▼
+                   ┌─────────────────────────────────────┐
+                   │          DataLoader                 │
+                   │  (CustomizedDataset; batching of     │
+                   │   indices via get_idx_data_loader)    │
+                   └─────────────┬───────────────────────┘
+                                 │
+                                 ▼
+                   ┌──────────────────────────────────────┐
+                   │         NeighborSampler              │
+                   │  (Prepares temporal neighbor info    │
+                   │   for each node based on interaction)  │
+                   └─────────────┬────────────────────────┘
+                                 │
+                                 ▼
+         ┌────────────────────────────────────────────────────────────┐
+         │                      GraphRec Model                        │
+         │  (models/GraphRec.py - Computes temporal node embeddings)    │
+         │                                                            │
+         │   Input: node_raw_features, user_dynamic_features,         │
+         │          neighbor_sampler, time_feat_dim,                  │
+         │          patch_size, max_seq_length, etc.                  │
+         │                                                            │
+         │   ┌────────────────────────────────────────────────────┐   │
+         │   │        1. Neighbor Retrieval & Padding             │   │
+         │   │   • For a batch of src & dst node IDs:             │   │
+         │   │       - Get first-hop neighbor IDs, edge IDs,       │   │
+         │   │         neighbor times (via sampler)                │   │
+         │   │       - Pad sequences to a fixed length (with       │   │
+         │   │         the target node prepended)                 │   │
+         │   └────────────────────────────────────────────────────┘   │
+         │                                                            │
+         │   ┌────────────────────────────────────────────────────┐   │
+         │   │        2. Feature Extraction & Patch Creation      │   │
+         │   │   • Use raw features for each neighbor             │   │
+         │   │   • Compute time difference and encode it with     │   │
+         │   │     TimeEncoder (cosine transformation)            │   │
+         │   │   • Segment padded sequences into patches          │   │
+         │   │     (patch_size × feature_dim per patch)           │   │
+         │   └────────────────────────────────────────────────────┘   │
+         │                                                            │
+         │   ┌────────────────────────────────────────────────────┐   │
+         │   │    3. Projection & Transformer Encoding            │   │
+         │   │   • Project each patch separately:                 │   │
+         │   │       - Node patch via linear layer                │   │
+         │   │       - Time patch via linear layer                │   │
+         │   │   • Concatenate features (2 channels: node & time)   │   │
+         │   │   • Process through several TransformerEncoder     │   │
+         │   │     layers (self-attention, skip-connections)        │   │
+         │   └────────────────────────────────────────────────────┘   │
+         │                                                            │
+         │   ┌────────────────────────────────────────────────────┐   │
+         │   │           4. Output Embedding                      │   │
+         │   │   • Mean-pool the patches' outputs                 │   │
+         │   │   • Use an output linear layer to get final         │   │
+         │   │     node embeddings (same dimensionality as raw)     │   │
+         │   └────────────────────────────────────────────────────┘   │
+         └─────────────┬────────────────────────────────────────────┘
+                       │
+                       ▼
+         ┌─────────────────────────────────────────────┐
+         │           MergeLayer (LinkPredictor)        │
+         │  (models/modules.py - Combines embeddings)  │
+         │  • Concatenation followed by FC layers         │
+         │  • Outputs a score (for an edge)               │
+         └─────────────┬───────────────────────────────┘
+                       │
+                       ▼
+         ┌──────────────────────────────────────────────┐
+         │         BPR Loss Computation &             │
+         │          Negative Sampling                 │
+         │  (utils/utils.py - MultipleNegativeEdgeSampler)│
+         │  • For each positive edge (src → dst):       │
+         │      - Sample 4 negative replacements            │
+         │      - Compare positive vs. negatives          │
+         │      - Compute BPR loss (maximize score diff)    │
+         └─────────────┬──────────────────────────────┘
+                       │
+                       ▼
+         ┌──────────────────────────────────────────────┐
+         │              Optimizer Step                 │
+         │  (train_link_prediction.py)                 │
+         │  (Back-propagation, weight update)          │
+         └──────────────────────────────────────────────┘
+                       │
+                       ▼
+         ┌──────────────────────────────────────────────┐
+         │           Evaluation & Metrics              │
+         │  (evaluate_models_utils.py)                 │
+         │  • Running evaluation on:                   │
+         │      - Validation set                        │
+         │      - Test set (including inductive splits) │
+         │  • Compute link prediction metrics            │
+         │    (utils/metrics.py)                       │
+         └──────────────────────────────────────────────┘

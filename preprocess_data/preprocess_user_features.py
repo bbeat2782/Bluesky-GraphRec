@@ -14,6 +14,14 @@ import numpy as np
 import scipy.sparse as sp
 import hashlib
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv('.env.local')
+user_dynamic_features_path = os.getenv('user_dynamic_features_path')
+scan_results_path = os.getenv('scan_results_path')
+user_mapping_path = os.getenv('user_mapping_path')
+post_embeddings_path = os.getenv('post_embeddings_path')
 
 
 def get_mapping_hash(mapping):
@@ -49,7 +57,7 @@ def update_mapping(mapping, new_items):
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-con = duckdb.connect('/home/sgan/scan_results.duckdb')
+con = duckdb.connect(scan_results_path)
 torch.manual_seed(42)  # IMPORTANT: temporary solution for deterministic results. Need this so that consumer_embeddings stays the same across runs.
 
 def create_user_embedding(end_date):
@@ -188,13 +196,8 @@ while current_date <= end_date:
 
 print("Finished processing all dates.")
 
-save_path = "/home/sgan/private/DyGLib/DG_data/bluesky/user_dynamic_features.pkl"
-
-with open(save_path, "wb") as f:
+with open(user_dynamic_features_path, "wb") as f:
     pickle.dump(user_dynamic_features, f)
-
-
-user_mapping_path = "/home/sgan/private/DyGLib/DG_data/bluesky/user_mapping.pkl"
 
 with open(user_mapping_path, "rb") as file:
     user_mapping = pickle.load(file)
@@ -207,8 +210,5 @@ user_dynamic_features_mapped = {
 
 print("User IDs in user_dynamic_features have been replaced with user_mapping indices.")
 
-
-save_path = "/home/sgan/private/DyGLib/DG_data/bluesky/user_dynamic_features.pkl"
-
-with open(save_path, "wb") as f:
+with open(user_dynamic_features_path, "wb") as f:
     pickle.dump(user_dynamic_features_mapped, f)

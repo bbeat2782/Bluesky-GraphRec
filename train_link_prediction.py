@@ -286,6 +286,11 @@ if __name__ == "__main__":
                     input_2=batch_neg_dst_node_embeddings_flat
                 ).squeeze(dim=-1).view(positive_scores.shape[0], 4)  # Reshape back to (batch_size, 4)
 
+                print(f'positive_scores.shape: {positive_scores.shape}')
+                print(f'negative_scores.shape: {negative_scores.shape}')
+                print(f'positive_scores: {positive_scores}')
+                print(f'negative_scores: {negative_scores}')
+
                 # Apply BPR loss: Maximize positive score over all negatives
                 bpr_loss = -torch.log(torch.sigmoid(positive_scores.unsqueeze(1) - negative_scores) + 1e-8).mean()
                 
