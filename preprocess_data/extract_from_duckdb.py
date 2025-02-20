@@ -7,12 +7,18 @@ from transformers import AutoModel
 import time
 from tqdm import tqdm
 import torch
+import os
+from dotenv import load_dotenv
 
 def pack_embeddings(binary_values):
     return np.packbits(binary_values).tobytes()
 
-#con = duckdb.connect('../random_tests/scan_results.duckdb')
-con = duckdb.connect('/home/sgan/scan_results.duckdb')
+# Load environment variables
+load_dotenv("../.env.local")
+DUCKDB_PATH = os.getenv('DUCKDB_PATH')
+DATA_PATH = os.getenv('DATA_PATH')
+
+con = duckdb.connect(DUCKDB_PATH)
 
 # Get the data
 df = con.execute("""
@@ -60,10 +66,10 @@ df = df.sort_values(by='timestamp')
 # Unix timestamp
 df['timestamp'] = df['timestamp'].astype('int64') // 10**6
 
-df.to_csv('/home/sgan/private/DyGLib/DG_data/bluesky/bluesky.csv', index=False)
-with open('/home/sgan/private/DyGLib/DG_data/bluesky/post_mapping.pkl', 'wb') as f:
+df.to_csv(os.path.join(DATA_PATH, 'bluesky.csv'), index=False)
+with open(os.path.join(DATA_PATH, 'post_mapping.pkl'), 'wb') as f:
     pickle.dump(post_mapping, f)
-with open('/home/sgan/private/DyGLib/DG_data/bluesky/user_mapping.pkl', 'wb') as f:
+with open(os.path.join(DATA_PATH, 'user_mapping.pkl'), 'wb') as f:
     pickle.dump(user_mapping, f)
     
 
@@ -103,6 +109,5 @@ for i in tqdm(range(0, len(texts), batch_size)):
 post_df = post_df.drop(columns=['text'])
 post_df['embeddings'] = all_embeddings
 print(post_df.columns)
-parquet_file_path = "/home/sgan/private/DyGLib/DG_data/bluesky/bluesky_text_embeddings.parquet"
-#post_df.to_parquet(parquet_file_path, index=False, compression='zstd')
+parquet_file_path = os.path.join(DATA_PATH, "bluesky_text_embeddings.parquet")
 post_df.to_parquet(parquet_file_path, index=False, compression='zstd', engine='pyarrow')
