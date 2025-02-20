@@ -12,8 +12,6 @@ import torch.nn as nn
 from torch.amp import autocast
 
 from models.TGAT import TGAT
-from models.GraphRec import GraphRec
-from models.GraphRecMulti import GraphRecMulti
 from models.GraphRecMultiCo import GraphRecMultiCo
 from models.modules import MergeLayer
 from utils.utils import set_random_seed, convert_to_gpu, get_parameter_sizes, create_optimizer, save_plot
@@ -97,7 +95,7 @@ if __name__ == "__main__":
         f.write(f"Number of batches in training: {len(train_idx_data_loader)}\n")
 
     val_metric_all_runs, new_node_val_metric_all_runs, test_metric_all_runs, new_node_test_metric_all_runs = [], [], [], []
-
+    print('args.time_gap', args.time_gap)
     for run in range(args.num_runs):
 
         set_random_seed(seed=run)
@@ -130,17 +128,7 @@ if __name__ == "__main__":
         logger.info(f'configuration is {args}')
 
         # create model
-        if args.model_name == 'GraphRec':
-            dynamic_backbone = GraphRec(node_raw_features=node_raw_features, neighbor_sampler=train_neighbor_sampler,
-                                         time_feat_dim=args.time_feat_dim, channel_embedding_dim=args.channel_embedding_dim, patch_size=args.patch_size,
-                                         num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout,
-                                         max_input_sequence_length=args.max_input_sequence_length, device=args.device, user_dynamic_features=user_dynamic_features, src_max_id=train_data.src_max_id)
-        elif args.model_name == 'GraphRecMulti':
-            dynamic_backbone = GraphRecMulti(node_raw_features=node_raw_features, neighbor_sampler=train_neighbor_sampler,
-                                         time_feat_dim=args.time_feat_dim, channel_embedding_dim=args.channel_embedding_dim, patch_size=args.patch_size,
-                                         num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout,
-                                         max_input_sequence_length=args.max_input_sequence_length, device=args.device, user_dynamic_features=user_dynamic_features, src_max_id=train_data.src_max_id)
-        elif args.model_name == 'GraphRecMultiCo':
+        if args.model_name == 'GraphRecMultiCo':
             dynamic_backbone = GraphRecMultiCo(node_raw_features=node_raw_features, neighbor_sampler=train_neighbor_sampler,
                                          time_feat_dim=args.time_feat_dim, channel_embedding_dim=args.channel_embedding_dim, patch_size=args.patch_size,
                                          num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout,
@@ -148,7 +136,7 @@ if __name__ == "__main__":
                                          src_max_id=train_data.src_max_id, walk_length=args.walk_length, num_neighbors=args.num_neighbors)
         elif args.model_name == 'TGAT':
             dynamic_backbone = TGAT(node_raw_features=node_raw_features, edge_raw_features=edge_raw_features, neighbor_sampler=train_neighbor_sampler,
-                                    time_feat_dim=args.time_feat_dim, num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout, device=args.device)
+                                    time_feat_dim=args.time_feat_dim, num_layers=args.num_layers, dropout=args.dropout, device=args.device)
         else:
             raise ValueError(f"Wrong value for model_name {args.model_name}!")
         link_predictor = MergeLayer(input_dim1=node_raw_features.shape[1], input_dim2=node_raw_features.shape[1],
@@ -161,7 +149,7 @@ if __name__ == "__main__":
         optimizer = create_optimizer(model=model, optimizer_name=args.optimizer, learning_rate=args.learning_rate, weight_decay=args.weight_decay)
 
         model = convert_to_gpu(model, device=args.device)
-
+        
         save_model_folder = f"./saved_models/{args.model_name}/{args.dataset_name}/{args.save_model_name}/"
         shutil.rmtree(save_model_folder, ignore_errors=True)
         os.makedirs(save_model_folder, exist_ok=True)
@@ -180,7 +168,7 @@ if __name__ == "__main__":
         for epoch in range(args.num_epochs):
 
             model.train()
-            if args.model_name in ['GraphRec', 'TGAT', 'GraphRecMulti', 'GraphRecMultiCo']:
+            if args.model_name in ['TGAT', 'GraphRecMultiCo']:
                 # training, only use training graph
                 model[0].set_neighbor_sampler(train_neighbor_sampler)
 
@@ -283,7 +271,6 @@ if __name__ == "__main__":
                     node_feat_dim = batch_neg_src_node_embeddings.shape[1]  # Get feature dimension
                     batch_neg_src_node_embeddings = batch_neg_src_node_embeddings.reshape(len(batch_src_node_ids), 4, node_feat_dim)
                     batch_neg_dst_node_embeddings = batch_neg_dst_node_embeddings.reshape(len(batch_src_node_ids), 4, node_feat_dim)
-
                 else:
                     raise ValueError(f"Wrong value for model_name {args.model_name}!")
 
@@ -322,7 +309,8 @@ if __name__ == "__main__":
                                                                      evaluate_idx_data_loader=val_idx_data_loader,
                                                                      evaluate_neg_edge_sampler=val_neg_edge_sampler,
                                                                      evaluate_data=val_data,
-                                                                     num_neighbors=args.num_neighbors)
+                                                                     num_neighbors=args.num_neighbors,
+                                                                     time_gap=args.time_gap)
 
             new_node_val_losses, new_node_val_metrics = evaluate_model_link_prediction(model_name=args.model_name,
                                                                                        model=model,
@@ -330,7 +318,9 @@ if __name__ == "__main__":
                                                                                        evaluate_idx_data_loader=new_node_val_idx_data_loader,
                                                                                        evaluate_neg_edge_sampler=new_node_val_neg_edge_sampler,
                                                                                        evaluate_data=new_node_val_data,
-                                                                                       num_neighbors=args.num_neighbors)
+                                                                                       num_neighbors=args.num_neighbors,
+                                                                                       time_gap=args.time_gap)
+
             # Saving training results
             train_loss_history.append(np.mean(train_losses))
             val_loss_history.append(np.mean(val_losses))
@@ -376,7 +366,8 @@ if __name__ == "__main__":
                                                                            evaluate_idx_data_loader=test_idx_data_loader,
                                                                            evaluate_neg_edge_sampler=test_neg_edge_sampler,
                                                                            evaluate_data=test_data,
-                                                                           num_neighbors=args.num_neighbors)
+                                                                           num_neighbors=args.num_neighbors,
+                                                                           time_gap=args.time_gap)
 
                 new_node_test_losses, new_node_test_metrics = evaluate_model_link_prediction(model_name=args.model_name,
                                                                                              model=model,
@@ -384,7 +375,8 @@ if __name__ == "__main__":
                                                                                              evaluate_idx_data_loader=new_node_test_idx_data_loader,
                                                                                              evaluate_neg_edge_sampler=new_node_test_neg_edge_sampler,
                                                                                              evaluate_data=new_node_test_data,
-                                                                                             num_neighbors=args.num_neighbors)
+                                                                                             num_neighbors=args.num_neighbors,
+                                                                                             time_gap=args.time_gap)
 
                 logger.info(f'test loss: {np.mean(test_losses):.4f}')
                 for metric_name in test_metrics[0].keys():
@@ -414,7 +406,8 @@ if __name__ == "__main__":
                                                                  evaluate_idx_data_loader=val_idx_data_loader,
                                                                  evaluate_neg_edge_sampler=val_neg_edge_sampler,
                                                                  evaluate_data=val_data,
-                                                                 num_neighbors=args.num_neighbors)
+                                                                 num_neighbors=args.num_neighbors,
+                                                                 time_gap=args.time_gap)
 
         new_node_val_losses, new_node_val_metrics = evaluate_model_link_prediction(model_name=args.model_name,
                                                                                    model=model,
@@ -422,7 +415,8 @@ if __name__ == "__main__":
                                                                                    evaluate_idx_data_loader=new_node_val_idx_data_loader,
                                                                                    evaluate_neg_edge_sampler=new_node_val_neg_edge_sampler,
                                                                                    evaluate_data=new_node_val_data,
-                                                                                   num_neighbors=args.num_neighbors)
+                                                                                   num_neighbors=args.num_neighbors,
+                                                                                   time_gap=args.time_gap)
 
         test_losses, test_metrics = evaluate_model_link_prediction(model_name=args.model_name,
                                                                    model=model,
@@ -430,7 +424,8 @@ if __name__ == "__main__":
                                                                    evaluate_idx_data_loader=test_idx_data_loader,
                                                                    evaluate_neg_edge_sampler=test_neg_edge_sampler,
                                                                    evaluate_data=test_data,
-                                                                   num_neighbors=args.num_neighbors)
+                                                                   num_neighbors=args.num_neighbors,
+                                                                   time_gap=args.time_gap)
 
         new_node_test_losses, new_node_test_metrics = evaluate_model_link_prediction(model_name=args.model_name,
                                                                                      model=model,
@@ -438,7 +433,8 @@ if __name__ == "__main__":
                                                                                      evaluate_idx_data_loader=new_node_test_idx_data_loader,
                                                                                      evaluate_neg_edge_sampler=new_node_test_neg_edge_sampler,
                                                                                      evaluate_data=new_node_test_data,
-                                                                                     num_neighbors=args.num_neighbors)
+                                                                                     num_neighbors=args.num_neighbors,
+                                                                                     time_gap=args.time_gap)
         # store the evaluation metrics at the current run
         val_metric_dict, new_node_val_metric_dict, test_metric_dict, new_node_test_metric_dict = {}, {}, {}, {}
 
