@@ -199,8 +199,7 @@ for day_num in range(total_days):
         try:
             user_dynamic_features[date_int][row['userId']] = consumer_embeddings[consumer_to_idx[row['userId']]]
         except KeyError:  # Skip users not found in consumer_to_idx
-            # user_dynamic_features[date_int][row['userId']] = np.zeros(embedding_dim)
-            continue
+            user_dynamic_features[date_int][row['userId']] = np.zeros(embedding_dim)
 
     # Move to the next day
     current_date += timedelta(days=1)
