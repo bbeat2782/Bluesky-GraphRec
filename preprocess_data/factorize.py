@@ -2,20 +2,47 @@ import torch
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import normalize
+from scipy.linalg import orthogonal_procrustes
 
-def factorize(coo_matrix, algorithm='svd', n_components=128, n_clusters=100, device='cuda'):
+
+def align_embeddings(source_consumer, source_producer, target_consumer):
+    """
+    Align both consumer and producer embeddings using the same rotation matrix.
+    Rotation matrix is computed from consumer embeddings.
+    
+    Args:
+        source_consumer: consumer embeddings to align (assumed same shape as target_consumer)
+        source_producer: producer embeddings to align (or None)
+        target_consumer: target consumer embeddings to align to
+    Returns:
+        aligned_consumer, aligned_producer: aligned embeddings
+    """
+    # Calculate optimal rotation matrix using consumer embeddings
+    R, _ = orthogonal_procrustes(source_consumer, target_consumer)
+    
+    # Apply rotation to consumer embeddings
+    aligned_consumer = source_consumer @ R
+    
+    # Handle case where source_producer is None
+    if source_producer is None:
+        aligned_producer = None
+    else:
+        aligned_producer = source_producer @ R
+    
+    return aligned_consumer, aligned_producer
+
+
+def factorize(coo_matrix, n_components=128, n_clusters=100, device='cuda', previous_consumer_embeddings=None):
     """
     Factorize the input matrix using PyTorch's SVD implementation.
     
     Args:
         coo_matrix: scipy sparse COO matrix of shape (n_consumers, n_producers)
-        algorithm: 'svd' only for now
         n_components: dimensionality of the embedding space
         n_clusters: number of producer communities
         device: 'cuda' or 'cpu'
+        previous_consumer_embeddings: consumer embeddings from previous day for alignment
     """
-    if algorithm != 'svd':
-        raise ValueError("Only 'svd' algorithm is supported in this implementation")
     
     # Convert scipy COO to torch sparse
     # Note: matrix.T because torch expects (n_features, n_samples)
@@ -41,14 +68,22 @@ def factorize(coo_matrix, algorithm='svd', n_components=128, n_clusters=100, dev
     producer_embeddings = (U * sqrt_S.unsqueeze(0)).cpu().numpy()
     
     # Compute consumer embeddings (V * sqrt(S))
-    # Note: V is already the right shape (n_consumers, n_components)
     consumer_embeddings = (V * sqrt_S.unsqueeze(0)).cpu().numpy()
     
     # L2 normalize both embeddings before clustering
     producer_embeddings_norm = normalize(producer_embeddings, norm='l2')
     consumer_embeddings_norm = normalize(consumer_embeddings, norm='l2')
     
-    # Cluster the normalized producer embeddings
+    # If we have previous embeddings, align the new ones (should be everything besides the first day)
+    if previous_consumer_embeddings is not None:
+        prev_consumer_emb = previous_consumer_embeddings
+        consumer_embeddings_norm, producer_embeddings_norm = align_embeddings(
+            consumer_embeddings_norm,
+            producer_embeddings_norm,
+            prev_consumer_emb
+        )
+    
+    # Cluster the aligned producer embeddings
     kmeans = KMeans(n_clusters=n_clusters, random_state=42)
     producer_communities = kmeans.fit_predict(producer_embeddings_norm)
     
@@ -60,82 +95,7 @@ def factorize(coo_matrix, algorithm='svd', n_components=128, n_clusters=100, dev
     
     producer_community_affinities = 1 - (assigned_distances / assigned_distances.max())
     
-    return producer_community_affinities, consumer_embeddings_norm, kmeans.cluster_centers_
+    return producer_communities, producer_community_affinities, consumer_embeddings_norm, producer_embeddings_norm, kmeans.cluster_centers_
 
 
 
-# ############################################################
-# IGNORE EVERYTHING BELOW
-# ############################################################
-
-# from torchnmf.nmf import NMF
-# from sklearn.cluster import KMeans
-# from sklearn.preprocessing import normalize
-# import numpy as np
-
-
-# def factorize_torch(matrix, alpha=0.0, n_components=20, n_clusters=100, device='cuda'):
-#     """
-#     Factorize using TorchNMF and get intermediate embeddings
-    
-#     Args:
-#         matrix: scipy sparse matrix
-#         algorithm: 'nmf' or 'svd'
-#         n_components: dimensionality of intermediate space
-#         n_clusters: number of final communities
-#         device: 'cuda' or 'cpu'
-#     """
-#     # Convert sparse matrix to torch tensor
-#     V = torch.from_numpy(matrix.T.toarray()).float().to(device)
-    
-#     # Initialize NMF model
-#     model = NMF(V.shape, n_components).to(device)
-    
-#     # Fit the model with L1 regularization
-#     model.fit(
-#         V,
-#         beta=1,  # KL divergence
-#         tol=1e-4,
-#         max_iter=200,
-#         verbose=True,
-#         alpha=alpha,  # Similar to alpha_W in sklearn
-#         l1_ratio=1.0
-#     )
-    
-#     # Get producer embeddings (equivalent to fit_transform in sklearn)
-#     producer_embeddings = model.H.detach().cpu().numpy()
-    
-#     # Get consumer embeddings through matrix multiplication
-#     consumer_embeddings = matrix @ producer_embeddings
-
-#     # L1 normalize both embeddings
-#     producer_embeddings_norm = normalize(producer_embeddings, norm='l1')
-#     consumer_embeddings_norm = normalize(consumer_embeddings, norm='l1')
-
-#     # Cluster the normalized producer embeddings
-#     kmeans = KMeans(n_clusters=n_clusters)
-#     producer_communities = kmeans.fit_predict(producer_embeddings_norm)
-
-#     # Calculate affinities
-#     assigned_distances = np.zeros(len(producer_embeddings_norm))
-#     for i, (producer, cluster) in enumerate(zip(producer_embeddings_norm, producer_communities)):
-#         distance = np.linalg.norm(producer - kmeans.cluster_centers_[cluster])
-#         assigned_distances[i] = distance
-
-#     producer_community_affinities = 1 - (assigned_distances / assigned_distances.max())
-
-#     return producer_community_affinities, consumer_embeddings_norm, kmeans.cluster_centers_
-
-# # Try it out
-# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# producer_community_affinities, consumer_embeddings, kmeans_cluster_centers = factorize_torch(
-#     matrix,
-#     n_components=20,
-#     n_clusters=100,
-#     device=device
-# )
-
-# # Print some stats
-# print(f"Producer affinities shape: {producer_community_affinities.shape}")
-# print(f"Consumer embeddings shape: {consumer_embeddings.shape}")
-# print(f"Cluster centers shape: {kmeans_cluster_centers.shape}")

@@ -10,8 +10,9 @@ import torch
 import os
 from dotenv import load_dotenv
 
-def pack_embeddings(binary_values):
-    return np.packbits(binary_values).tobytes()
+# Q: DO we delete this? leftover code?
+# def pack_embeddings(binary_values):
+#     return np.packbits(binary_values).tobytes()
 
 # Load environment variables
 load_dotenv("../.env.local")

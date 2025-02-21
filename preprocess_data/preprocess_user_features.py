@@ -58,7 +58,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 con = duckdb.connect(DUCKDB_PATH)
 torch.manual_seed(42)  # IMPORTANT: temporary solution for deterministic results. Need this so that consumer_embeddings stays the same across runs.
 
-def create_user_embedding(end_date):
+def create_user_embedding(end_date, previous_consumer_embeddings=None):
     train_producer_df = con.execute(f"""
     WITH producers AS (
         SELECT 
@@ -144,12 +144,12 @@ def create_user_embedding(end_date):
     
     print("Matrix shape:", matrix.shape)
 
-    producer_community_affinities, consumer_embeddings, kmeans_cluster_centers = factorize(
+    producer_communities, producer_community_affinities, consumer_embeddings, producer_embeddings, kmeans_cluster_centers = factorize(
         matrix, 
-        algorithm='svd',
         n_components=64,
         n_clusters=100,
-        device=device
+        device=device,
+        previous_consumer_embeddings=previous_consumer_embeddings  # Pass previous embeddings
     )
 
     return consumer_embeddings, consumer_to_idx
@@ -161,14 +161,26 @@ start_date = datetime.strptime("2023-03-15", "%Y-%m-%d")
 end_date = datetime.strptime("2023-06-30", "%Y-%m-%d")
 embedding_dim=64
 
+# Calculate total number of days
+total_days = (end_date - start_date).days + 1
+
 # Iterate through each day in the range
 current_date = start_date
-while current_date <= end_date:
+previous_consumer_embeddings = None
+for day_num in range(total_days):
     date_str = current_date.strftime("%Y-%m-%d")
     date_int = int(current_date.timestamp())
+    
+    print(f"Processing date {date_str} ({day_num + 1}/{total_days})")
 
     # Get embeddings and consumer ID mapping
-    consumer_embeddings, consumer_to_idx = create_user_embedding(date_str)
+    consumer_embeddings, consumer_to_idx = create_user_embedding(
+        date_str, 
+        previous_consumer_embeddings=previous_consumer_embeddings
+    )
+    
+    # Store current embeddings for next iteration
+    previous_consumer_embeddings = consumer_embeddings
 
     # Query likes data for the given day
     likes_df = con.execute(f"""
@@ -186,8 +198,9 @@ while current_date <= end_date:
     for _, row in likes_df.iterrows():
         try:
             user_dynamic_features[date_int][row['userId']] = consumer_embeddings[consumer_to_idx[row['userId']]]
-        except KeyError:  # If user is not found, assign zero vector
-            user_dynamic_features[date_int][row['userId']] = np.zeros(embedding_dim)
+        except KeyError:  # Skip users not found in consumer_to_idx
+            # user_dynamic_features[date_int][row['userId']] = np.zeros(embedding_dim)
+            continue
 
     # Move to the next day
     current_date += timedelta(days=1)

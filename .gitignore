@@ -153,3 +153,5 @@ lightgcn
 .env.local
 
 **/recommended_posts.json
+
+*.pkl
