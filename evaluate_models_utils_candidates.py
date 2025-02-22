@@ -14,6 +14,7 @@ from utils.metrics import get_link_prediction_metrics
 from utils.utils import set_random_seed
 from utils.utils import NeighborSampler
 from utils.DataLoader import Data
+from utils.candidates import dummy_candidate_generator
 
 
 def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborSampler, evaluate_idx_data_loader: DataLoader,
@@ -52,19 +53,23 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
             popularity_based = False  # TODO make this as an argument
             if popularity_based:
                 model_name = 'Popularity'
-                candidates_dict = evaluate_neg_edge_sampler.sample(
-                    len(batch_src_node_ids), 
-                    batch_src_node_ids, 
-                    batch_dst_node_ids, 
-                    batch_node_interact_times,
-                    popularity_based=popularity_based
-                )
 
-                # # Write candidates_dict to file for debugging
-                # with open('candidates_dict_debug.txt', 'w') as f:
-                #     f.write(str(candidates_dict))
+                # candidates_dict = evaluate_neg_edge_sampler.sample(
+                #     len(batch_src_node_ids), 
+                #     batch_src_node_ids, 
+                #     batch_dst_node_ids, 
+                #     batch_node_interact_times,
+                #     popularity_based=popularity_based
+                # )
 
-                # print('candidates_dict', candidates_dict)
+                candidates_dict = dummy_candidate_generator(batch_src_node_ids, batch_node_interact_times)
+
+
+                # Write candidates_dict to file for debugging
+                with open('candidates_dict_debug.txt', 'w') as f:
+                    f.write(str(candidates_dict))
+
+                print('candidates_dict', candidates_dict)
 
                 for true_dst_id, interact_time in zip(batch_dst_node_ids, batch_node_interact_times):
                     candidates = candidates_dict[interact_time]
@@ -79,12 +84,14 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                     mrr_results.append(reciprocal_rank)
                     recommended_posts.append(candidates.tolist())
             else:
-                candidates_dict = evaluate_neg_edge_sampler.sample(
-                    len(batch_src_node_ids), 
-                    batch_src_node_ids, 
-                    batch_dst_node_ids, 
-                    batch_node_interact_times
-                )
+                # candidates_dict = evaluate_neg_edge_sampler.sample(
+                #     len(batch_src_node_ids), 
+                #     batch_src_node_ids, 
+                #     batch_dst_node_ids, 
+                #     batch_node_interact_times
+                # )
+
+                candidates_dict = dummy_candidate_generator(batch_src_node_ids, batch_node_interact_times)
     
                 # Iterate through candidates_dict to calculate lengths
                 for start_time, candidates in candidates_dict.items():

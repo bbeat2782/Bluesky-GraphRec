@@ -5,34 +5,43 @@ from sklearn.preprocessing import normalize
 from scipy.linalg import orthogonal_procrustes
 
 
-def align_embeddings(source_consumer, source_producer, target_consumer):
+def align_embeddings(source_consumer, source_producer, target_consumer, consumer_ids=None, prev_consumer_ids=None):
     """
-    Align both consumer and producer embeddings using the same rotation matrix.
-    Rotation matrix is computed from consumer embeddings.
+    Align embeddings using only common users between days.
     
     Args:
-        source_consumer: consumer embeddings to align (assumed same shape as target_consumer)
-        source_producer: producer embeddings to align (or None)
-        target_consumer: target consumer embeddings to align to
-    Returns:
-        aligned_consumer, aligned_producer: aligned embeddings
+        source_consumer: new day's consumer embeddings
+        source_producer: new day's producer embeddings
+        target_consumer: previous day's consumer embeddings
+        consumer_ids: current day's consumer IDs
+        prev_consumer_ids: previous day's consumer IDs
     """
-    # Calculate optimal rotation matrix using consumer embeddings
-    R, _ = orthogonal_procrustes(source_consumer, target_consumer)
-    
-    # Apply rotation to consumer embeddings
-    aligned_consumer = source_consumer @ R
-    
-    # Handle case where source_producer is None
-    if source_producer is None:
-        aligned_producer = None
+    if consumer_ids is not None and prev_consumer_ids is not None:
+        # Find common users
+        common_users = set(consumer_ids) & set(prev_consumer_ids)
+        
+        # Get indices for common users
+        curr_mask = np.array([id in common_users for id in consumer_ids])
+        prev_mask = np.array([id in common_users for id in prev_consumer_ids])
+        
+        # Align using only common users
+        R, _ = orthogonal_procrustes(
+            source_consumer[curr_mask], 
+            target_consumer[prev_mask]
+        )
     else:
-        aligned_producer = source_producer @ R
+        # If no IDs provided, assume same users (old behavior)
+        R, _ = orthogonal_procrustes(source_consumer, target_consumer)
+    
+    # Apply rotation to all users
+    aligned_consumer = source_consumer @ R
+    aligned_producer = source_producer @ R
     
     return aligned_consumer, aligned_producer
 
 
-def factorize(coo_matrix, n_components=128, n_clusters=100, device='cuda', previous_consumer_embeddings=None):
+def factorize(coo_matrix, n_components=128, n_clusters=100, device='cuda', 
+              previous_embeddings=None, consumer_ids=None, prev_consumer_ids=None):
     """
     Factorize the input matrix using PyTorch's SVD implementation.
     
@@ -41,7 +50,9 @@ def factorize(coo_matrix, n_components=128, n_clusters=100, device='cuda', previ
         n_components: dimensionality of the embedding space
         n_clusters: number of producer communities
         device: 'cuda' or 'cpu'
-        previous_consumer_embeddings: consumer embeddings from previous day for alignment
+        previous_embeddings: previous day's embeddings (consumer, producer)
+        consumer_ids: current day's consumer IDs
+        prev_consumer_ids: previous day's consumer IDs
     """
     
     # Convert scipy COO to torch sparse
@@ -75,12 +86,14 @@ def factorize(coo_matrix, n_components=128, n_clusters=100, device='cuda', previ
     consumer_embeddings_norm = normalize(consumer_embeddings, norm='l2')
     
     # If we have previous embeddings, align the new ones (should be everything besides the first day)
-    if previous_consumer_embeddings is not None:
-        prev_consumer_emb = previous_consumer_embeddings
+    if previous_embeddings is not None:
+        prev_producer_emb, prev_consumer_emb = previous_embeddings
         consumer_embeddings_norm, producer_embeddings_norm = align_embeddings(
             consumer_embeddings_norm,
             producer_embeddings_norm,
-            prev_consumer_emb
+            prev_consumer_emb,
+            consumer_ids,
+            prev_consumer_ids
         )
     
     # Cluster the aligned producer embeddings

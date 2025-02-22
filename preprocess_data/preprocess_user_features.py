@@ -58,14 +58,14 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 con = duckdb.connect(DUCKDB_PATH)
 torch.manual_seed(42)  # IMPORTANT: temporary solution for deterministic results. Need this so that consumer_embeddings stays the same across runs.
 
-def create_user_embedding(end_date, previous_consumer_embeddings=None):
+def create_user_embedding(date_str, previous_embeddings=None, prev_consumer_ids=None):
     train_producer_df = con.execute(f"""
     WITH producers AS (
         SELECT 
             json_extract_string(record, '$.subject') as producer_did
         FROM records 
         WHERE collection = 'app.bsky.graph.follow'
-        AND createdAt < '{end_date}'  -- before training cutoff date
+        AND createdAt < '{date_str}'  -- before training cutoff date
         AND createdAt >= '2023-01-01' 
         GROUP BY json_extract_string(record, '$.subject')
         HAVING COUNT(*) >= 30
@@ -136,7 +136,7 @@ def create_user_embedding(end_date, previous_consumer_embeddings=None):
     cols = [producer_to_idx[producer] for producer in train_edges_df['producer_did']]
     data = np.ones(len(rows))
     
-    # Build the sparse matrix (then convert to CSR format for efficient multiplication)
+    # Build the sparse matrix (then convert to CSR format for efficient multiplication)z
     matrix = sp.coo_matrix(
         (data, (rows, cols)),
         shape=(len(consumer_to_idx), len(producer_to_idx))
@@ -144,15 +144,18 @@ def create_user_embedding(end_date, previous_consumer_embeddings=None):
     
     print("Matrix shape:", matrix.shape)
 
+    # Get current day's consumer IDs
+    consumer_ids = list(consumer_to_idx.keys())
+    
     producer_communities, producer_community_affinities, consumer_embeddings, producer_embeddings, kmeans_cluster_centers = factorize(
-        matrix, 
+        matrix,
         n_components=64,
-        n_clusters=100,
-        device=device,
-        previous_consumer_embeddings=previous_consumer_embeddings  # Pass previous embeddings
+        previous_embeddings=previous_embeddings,
+        consumer_ids=consumer_ids,
+        prev_consumer_ids=prev_consumer_ids
     )
-
-    return consumer_embeddings, consumer_to_idx
+    
+    return consumer_embeddings, consumer_to_idx, producer_embeddings, producer_to_idx
 
 
 user_dynamic_features = {}
@@ -166,7 +169,8 @@ total_days = (end_date - start_date).days + 1
 
 # Iterate through each day in the range
 current_date = start_date
-previous_consumer_embeddings = None
+previous_embeddings = None
+prev_consumer_ids = None
 for day_num in range(total_days):
     date_str = current_date.strftime("%Y-%m-%d")
     date_int = int(current_date.timestamp())
@@ -174,13 +178,15 @@ for day_num in range(total_days):
     print(f"Processing date {date_str} ({day_num + 1}/{total_days})")
 
     # Get embeddings and consumer ID mapping
-    consumer_embeddings, consumer_to_idx = create_user_embedding(
+    consumer_embeddings, consumer_to_idx, producer_embeddings, producer_to_idx = create_user_embedding(
         date_str, 
-        previous_consumer_embeddings=previous_consumer_embeddings
+        previous_embeddings=previous_embeddings,
+        prev_consumer_ids=prev_consumer_ids
     )
     
-    # Store current embeddings for next iteration
-    previous_consumer_embeddings = consumer_embeddings
+    # Store for next iteration
+    previous_embeddings = (producer_embeddings, consumer_embeddings)
+    prev_consumer_ids = list(consumer_to_idx.keys())
 
     # Query likes data for the given day
     likes_df = con.execute(f"""
