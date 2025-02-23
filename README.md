@@ -76,6 +76,14 @@ python evaluate_link_prediction.py --dataset_name bluesky --model_name TGAT --nu
 python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 12 --num_runs 1 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2 --walk_length 2 --num_neighbors 12 --seed 50
 ```
 
+```{bash}
+python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 3 --num_runs 1 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2 --walk_length 2 --num_neighbors 12 --seed 25
+```
+
+```{bash}
+python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 6 --num_runs 2 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2 --walk_length 2 --num_neighbors 12 --seed 1000
+```
+
 ## Acknowledgments
 
 We are grateful to the authors of 
