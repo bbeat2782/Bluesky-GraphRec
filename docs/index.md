@@ -33,11 +33,26 @@ By leveraging graph structures and temporal learning, we aim to:
 
 ## Data Collection
 
+[![Bluesky Screenshot](assets/bluesky.png)](https://bsky.app)
+
 Bluesky provides an open API that streams real-time data across the network. The dataset used in this project consists of two primary interaction types:
 - Likes: Users engage with posts by liking them.
 - Follows: Users follow others, forming a network of content producers and consumers.
 
-We collect the interaction data from the Bluesky network using an open-source library that efficiently pulls interactions and stores them in a structured database. Since the data is continuously growing, we limit our experiments to a 2023 ~ 2023 (need to check the exact time later) subset, covering an about 1.2 millions of interactions.
+<p align="center">
+   <img src="assets/graph.svg" width="30%" />
+</p>
+
+We collect the interaction data from the Bluesky network using an open-source library that efficiently pulls interactions and stores them in a structured database. Since the data is continuously growing, we limit our experiments to a 2023 ~ 2023 (need to check the exact time later) subset, covering an about 1.2 millions of like interactions.
+
+### Dataset Summary
+
+| **Metric**       | **Count**  |
+|------------------|-----------|
+| Number of Users  | X,XXX     |
+| Number of Posts  | X,XXX     |
+| Number of Likes  | 1,200,000 |
+| Number of Followings | X,XXX |
 
 ---
 
@@ -85,13 +100,15 @@ Despite its computational complexity, GraphRec outperforms baseline recommendati
 
 To efficiently process the vast number of interactions in social media graphs, GraphRec employs neighborhood sampling. Instead of considering the entire interaction history of a user, we select a fixed-size set of neighbors to ensure computational feasibility. By limiting the number of neighbors per node, we reduce memory consumption and improve computational efficiency, making the model suitable for large-scale deployment.
 
-For a given user $$ u $$ interacting with a post $$ p $$, we sample the most recent 12 interactions along 2-hop neighbors. This means that each user’s and post's receptive field consists of:
-- 12 direct neighbors (1-hop)
-- 12 × 12 = 144 indirect neighbors (2-hop)
+<p align="center">
+  <img src="assets/sampling.svg" width="60%">
+</p>
 
-Thus, each interaction contains information from 12 + 144 = 156 neighboring nodes. This ensures that the model has sufficient contextual information while remaining computationally feasible.
+For a given user $$ u $$ interacting with a post $$ p $$, we sample the most recent 10 interactions along 2-hop neighbors. This means that each user’s and post's receptive field consists of:
+- 10 direct neighbors (1-hop)
+- 10 × 10 = 100 indirect neighbors (2-hop)
 
-<!-- NOTE perhaps a diagram may be helpful -->
+Thus, each interaction contains information from 10 + 100 = 110 neighboring nodes. This ensures that the model has sufficient contextual information while remaining computationally feasible.
 
 The selection of recent neighbors follows:
 
@@ -111,11 +128,14 @@ By prioritizing recent interactions, the model dynamically adapts to users' evol
 
 GraphRec integrates multiple feature types to enhance ranking performance. These features include:
 
-1. Post Raw Text Features: Each post is represented using [Jina Embeddings](https://huggingface.co/jinaai/jina-embeddings-v3), a pre-trained text embedding model optimized for large-scale text processing. These embeddings encode semantic relationships between posts, helping the model identify content that is similar in meaning even if the wording differs.
+1. **Post Raw Text Features:**  
+    Each post is represented using [Jina Embeddings](https://huggingface.co/jinaai/jina-embeddings-v3), a pre-trained text embedding model optimized for large-scale text processing. These embeddings encode semantic relationships between posts, helping the model identify content that is similar in meaning even if the wording differs.
 
-2. User Features: Each user is represented using embeddings derived from the consumer-producer graph, capturing their historical preferences. Instead of treating users as isolated entities, this embedding considers who they follow and what content they interact with, ensuring a personalized recommendation experience.
+2. **User Features:**  
+    Each user is represented using embeddings derived from the consumer-producer graph, capturing their historical preferences. Instead of treating users as isolated entities, this embedding considers who they follow and what content they interact with, ensuring a personalized recommendation experience.
 
-3. Temporal Encoding: Time plays a crucial role in social media recommendations, as user interests can shift rapidly. To incorporate this temporal information, we apply relative time encodings, which map the elapsed time since the last interaction into a continuous embedding space.
+3. **Temporal Encoding:**  
+    Time plays a crucial role in social media recommendations, as user interests can shift rapidly. To incorporate this temporal information, we apply relative time encodings, which map the elapsed time since the last interaction into a continuous embedding space.
 
    $$
    \mathbf{X}_t = \sqrt{\frac{1}{d_T}} [\cos(w_1 \Delta t), \sin(w_1 \Delta t), ..., \cos(w_{d_T} \Delta t)]
@@ -123,7 +143,12 @@ GraphRec integrates multiple feature types to enhance ranking performance. These
 
    where $$ \Delta t $$ represents the time difference between the current and previous interaction, and $$ w_i $$ are learnable components that help capture periodic behaviors in user interactions.
 
-4. Shared Neighbors Feature:  In social media, people with similar interests often interact with the same posts, and posts that cover related topics tend to attract overlapping audiences. GraphRec captures this behavior by analyzing shared neighbors between users and posts. Instead of only looking at direct interactions, it examines how a user and a post are connected through mutual engagement patterns. For example, if a user frequently interacts with posts that have also been engaged with by other users with similar interests, GraphRec considers these shared connections to refine recommendations. Similarly, if a post is liked by multiple users who have engaged with similar content in the past, the model recognizes that this post might also be relevant to other users within the same engagement network. By leveraging shared neighbor information, GraphRec improves its ability to recommend posts that align with user preferences, even when a direct interaction has not yet occurred. This helps the model surface relevant content.
+4. **Shared Neighbors Feature:**  
+    In social media, people with similar interests often interact with the same posts, and posts that cover related topics tend to attract overlapping audiences. GraphRec captures this behavior by analyzing shared neighbors between users and posts. Instead of only looking at direct interactions, it examines how a user and a post are connected through mutual engagement patterns.
+    
+    For example, if a user frequently interacts with posts that have also been engaged with by other users with similar interests, GraphRec considers these shared connections to refine recommendations. Similarly, if a post is liked by multiple users who have engaged with similar content in the past, the model recognizes that this post might also be relevant to other users within the same engagement network.
+    
+    By leveraging shared neighbor information, GraphRec improves its ability to recommend posts that align with user preferences, even when a direct interaction has not yet occurred. This helps the model surface relevant content.
 
 ---
 
@@ -182,6 +207,10 @@ where:
 - $$ \mathbf{H}_{user}, \mathbf{H}_{post} $$ are the final user and post embeddings.
 
 This ranking score represents the likelihood of a user interacting with a post, and the model is trained using Bayesian Personalized Ranking loss.
+
+---
+
+### Whole Pipeline
 
 <div style="width: 100%; display: flex; justify-content: center;">
     <object type="image/svg+xml" data="assets/pipeline2.svg" style="width: 100%; max-height: 500px;"></object>
