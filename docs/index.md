@@ -100,9 +100,14 @@ Despite its computational complexity, GraphRec outperforms baseline recommendati
 
 To efficiently process the vast number of interactions in social media graphs, GraphRec employs neighborhood sampling. Instead of considering the entire interaction history of a user, we select a fixed-size set of neighbors to ensure computational feasibility. By limiting the number of neighbors per node, we reduce memory consumption and improve computational efficiency, making the model suitable for large-scale deployment.
 
-<p align="center">
+<!-- <p align="center">
   <img src="assets/sampling.svg" width="60%">
-</p>
+</p> -->
+
+<figure style="text-align: center;">
+   <img src="assets/sampling.svg" width="60%" />
+   <!-- <figcaption>Jina Embeddings encode the semantic structure of text data.</figcaption> -->
+</figure>
 
 For a given user $$ u $$ interacting with a post $$ p $$, we sample the most recent 10 interactions along 2-hop neighbors. This means that each user’s and post's receptive field consists of:
 - 10 direct neighbors (1-hop)
@@ -130,6 +135,11 @@ GraphRec integrates multiple feature types to enhance ranking performance. These
 
 1. **Post Raw Text Features:**  
     Each post is represented using [Jina Embeddings](https://huggingface.co/jinaai/jina-embeddings-v3), a pre-trained text embedding model optimized for large-scale text processing. These embeddings encode semantic relationships between posts, helping the model identify content that is similar in meaning even if the wording differs.
+
+    <figure style="text-align: center;">
+        <img src="assets/text-features.svg" width="80%" />
+         <figcaption>Jina Embeddings encode the semantic structure of text data.</figcaption>
+    </figure>
 
 2. **User Features:**  
     Each user is represented using embeddings derived from the consumer-producer graph, capturing their historical preferences. Instead of treating users as isolated entities, this embedding considers who they follow and what content they interact with, ensuring a personalized recommendation experience.
