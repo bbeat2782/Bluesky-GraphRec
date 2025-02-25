@@ -52,11 +52,11 @@ python preprocess_data.py  --dataset_name bluesky
 * Training *GraphRec* on *Bluesky* dataset:
 
 ```{bash}
-python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 6 --num_runs 1 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2 --walk_length 2 --num_neighbors 12 --seed 100
+python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 5 --num_runs 5 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2 --walk_length 2 --num_neighbors 10 --seed 42
 ```
 
 ```{bash}
-python train_link_prediction.py --dataset_name bluesky --model_name TGAT --num_runs 1 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_neighbors 12 --num_layers 2 --seed 100
+python train_link_prediction.py --dataset_name bluesky --model_name TGAT --num_runs 5 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_neighbors 10 --num_layers 2 --seed 42
 ```
 
 #### Model Evaluation
@@ -78,10 +78,6 @@ python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMult
 
 ```{bash}
 python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 3 --num_runs 1 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2 --walk_length 2 --num_neighbors 12 --seed 25
-```
-
-```{bash}
-python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 6 --num_runs 2 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2 --walk_length 2 --num_neighbors 12 --seed 1000
 ```
 
 ## Acknowledgments
