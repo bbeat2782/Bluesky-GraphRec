@@ -36,6 +36,34 @@ if __name__ == "__main__":
     node_raw_features, edge_raw_features, full_data, train_data, val_data, test_data, new_node_val_data, new_node_test_data, user_dynamic_features = \
         get_link_prediction_data(dataset_name=args.dataset_name, val_ratio=args.val_ratio, test_ratio=args.test_ratio)
 
+    # Print dataset statistics
+    print("\n=== Dataset Statistics ===")
+    print(f"Number of nodes: {len(node_raw_features)}")
+    print(f"Node feature dimension: {node_raw_features.shape[1]}")
+    print(f"Number of edge features: {len(edge_raw_features)}")
+    print(f"Edge feature dimension: {edge_raw_features.shape[1]}")
+    print("\nTraining set:")
+    print(f"Number of interactions: {len(train_data.src_node_ids)}")
+    print(f"Number of unique nodes: {train_data.num_unique_nodes}")
+    print(f"Maximum source node ID: {train_data.src_max_id}")
+    print("\nValidation set:")
+    print(f"Number of interactions: {len(val_data.src_node_ids)}")
+    print(f"Number of unique nodes: {val_data.num_unique_nodes}")
+    print("\nTest set:") 
+    print(f"Number of interactions: {len(test_data.src_node_ids)}")
+    print(f"Number of unique nodes: {test_data.num_unique_nodes}")
+    print("\nNew node validation set:")
+    print(f"Number of interactions: {len(new_node_val_data.src_node_ids)}")
+    print(f"Number of unique nodes: {new_node_val_data.num_unique_nodes}")
+    print("\nNew node test set:")
+    print(f"Number of interactions: {len(new_node_test_data.src_node_ids)}")
+    print(f"Number of unique nodes: {new_node_test_data.num_unique_nodes}")
+    print("\nUser dynamic features:")
+    print(f"Number of dates: {len(user_dynamic_features)}")
+    print(f"Example date: {list(user_dynamic_features.keys())[0]}")
+    print(f"Users on example date: {len(user_dynamic_features[list(user_dynamic_features.keys())[0]])}")
+    print("=========================\n")
+
     # initialize training neighbor sampler to retrieve temporal graph
     train_neighbor_sampler = get_neighbor_sampler(data=train_data, sample_neighbor_strategy=args.sample_neighbor_strategy,
                                                   time_scaling_factor=args.time_scaling_factor, seed=0)

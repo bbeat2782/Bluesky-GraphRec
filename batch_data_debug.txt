@@ -1,0 +1,9 @@
+batch_src_node_ids:
+[ 2  3 10 20]
+
+batch_dst_node_ids:
+[107151 106935 108104 108297]
+
+batch_node_interact_times:
+[1.68685714e+09 1.68680398e+09 1.68680062e+09 1.68678959e+09]
+
