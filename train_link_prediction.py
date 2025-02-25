@@ -74,6 +74,10 @@ if __name__ == "__main__":
 
     for run in range(args.num_runs):
 
+        # Skipping TGAT run = 0
+        if run == 0 or run == 1 or run == 2 or run == 4:
+            continue
+
         set_random_seed(seed=run)
 
         # args.seed = run
@@ -339,6 +343,15 @@ if __name__ == "__main__":
             for metric_name in val_metrics[0].keys():
                 val_metric_indicator.append((metric_name, np.mean([val_metric[metric_name] for val_metric in val_metrics]), True))
             early_stop = early_stopping.step(val_metric_indicator, model)
+
+            # # Compute the mean validation loss
+            # val_loss = np.mean(val_losses)
+            
+            # # Use validation loss as the stopping criterion (lower is better)
+            # val_metric_indicator = [("val_loss", val_loss, False)]  # Lower is better
+            
+            # # Execute early stopping based on loss
+            # early_stop = early_stopping.step(val_metric_indicator, model)
 
             if early_stop:
                 break

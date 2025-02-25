@@ -3,8 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Load JSON data
-graphrec_path = 'GraphRecMultiCo/bluesky/training_results_100.json'  # Renamed for clarity
-mlp_path = 'TGAT/bluesky/training_results_100.json'
+graphrec_path = 'GraphRecMultiCo/bluesky/training_results_42_1.json'  # Renamed for clarity
+mlp_path = 'TGAT/bluesky/training_results_42_1.json'
 
 with open(graphrec_path, 'r') as f:
     graphrec_data = json.load(f)
@@ -59,14 +59,15 @@ for i, (metric_key, metric_label) in enumerate(metrics.items()):
                 # Ensure epochs start from 1
                 epochs = np.arange(1, len(model_data[history_key]) + 1)
                 plt.plot(epochs, model_data[history_key], linestyle=linestyle, color=colors[model_name], 
-                         label=f"{model_name} - {label_name}" if i == 0 else None)  # Show legend only in first plot
+                         #label=f"{model_name} - {label_name}" if i == 0 else None)  # Show legend only in first plot
+                         label=f"{model_name} - {label_name}")  # Show legend only in first plot
 
     plt.xlabel("Epochs")
     plt.ylabel(metric_label)
     plt.title(f"Comparison of {metric_label} for GraphRec and MLP-Based Models")
 
-    if i == 0:  # Only include legend in the first plot
-        plt.legend()
+    #if i == 0:  # Only include legend in the first plot
+    plt.legend()
 
     plt.grid(True)
     plt.savefig(plot_filenames[metric_key])  # Save figure
