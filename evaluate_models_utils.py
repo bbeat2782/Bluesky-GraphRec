@@ -60,25 +60,6 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                     popularity_based=popularity_based
                 )
 
-                # Write shapes to debug file first
-                with open('candidates_dict_debug.txt', 'w') as f:
-                    total_candidates = sum(len(candidates) for candidates in candidates_dict.values())
-                    f.write(f'Total number of candidates across all times: {total_candidates}\n')
-                    f.write(f'Number of unique times: {len(candidates_dict)}\n\n')
-                    
-                    f.write('Candidates shapes by time:\n')
-                    for time, candidates in candidates_dict.items():
-                        f.write(f'  time {time}: candidates shape {np.array(list(candidates)).shape}\n')
-                    
-                    f.write('\nFull candidates dictionary:\n')
-                    f.write(str(candidates_dict))
-
-                # Print shapes for debugging
-                print('candidates_dict shapes:')
-                for time, candidates in candidates_dict.items():
-                    print(f'  time {time}: candidates shape {np.array(list(candidates)).shape}')
-                print('candidates_dict:', candidates_dict)
-
                 for true_dst_id, interact_time in zip(batch_dst_node_ids, batch_node_interact_times):
                     candidates = candidates_dict[interact_time]
 
@@ -92,14 +73,6 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                     mrr_results.append(reciprocal_rank)
                     recommended_posts.append(candidates.tolist())
             else:
-                # Write batch data to file for debugging
-                with open('batch_data_debug.txt', 'w') as f:
-                    f.write('batch_src_node_ids:\n')
-                    f.write(str(batch_src_node_ids) + '\n\n')
-                    f.write('batch_dst_node_ids:\n') 
-                    f.write(str(batch_dst_node_ids) + '\n\n')
-                    f.write('batch_node_interact_times:\n')
-                    f.write(str(batch_node_interact_times) + '\n\n')
 
                 candidates_dict = evaluate_neg_edge_sampler.sample(
                     len(batch_src_node_ids), 
@@ -107,25 +80,6 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                     batch_dst_node_ids, 
                     batch_node_interact_times
                 )
-
-                # Write shapes to debug file first
-                with open('candidates_dict_debug.txt', 'w') as f:
-                    total_candidates = sum(len(candidates) for candidates in candidates_dict.values())
-                    f.write(f'Total number of candidates across all times: {total_candidates}\n')
-                    f.write(f'Number of unique times: {len(candidates_dict)}\n\n')
-                    
-                    f.write('Candidates shapes by time:\n')
-                    for time, candidates in candidates_dict.items():
-                        f.write(f'  time {time}: candidates shape {np.array(list(candidates)).shape}\n')
-                    
-                    f.write('\nFull candidates dictionary:\n')
-                    f.write(str(candidates_dict))
-
-                # Print shapes for debugging
-                print('candidates_dict shapes:')
-                for time, candidates in candidates_dict.items():
-                    print(f'  time {time}: candidates shape {np.array(list(candidates)).shape}')
-                print('candidates_dict:', candidates_dict)
     
                 # Iterate through candidates_dict to calculate lengths
                 for start_time, candidates in candidates_dict.items():

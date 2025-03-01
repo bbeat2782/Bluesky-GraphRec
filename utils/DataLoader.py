@@ -248,7 +248,7 @@ def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_rati
     graph_df = pd.read_csv('./processed_data/{}/ml_{}.csv'.format(dataset_name, dataset_name))
     edge_raw_features = np.load('./processed_data/{}/ml_{}.npy'.format(dataset_name, dataset_name))
     node_raw_features = np.load('./processed_data/{}/ml_{}_node.npy'.format(dataset_name, dataset_name))
-    dynamic_user_features_path = './DG_data/bluesky/user_dynamic_features.pkl'
+    dynamic_user_features_path = './processed_data/bluesky/user_dynamic_features.pkl' # changed from DG_data
     with open(dynamic_user_features_path, "rb") as file:
         dynamic_user_features = pickle.load(file)
 
@@ -333,7 +333,7 @@ def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_rati
     filtered_idx = idx[val_mask]
 
     
-    length_restrict = int(0.1 * len(filtered_src_node_ids))
+    length_restrict = int(0.001 * len(filtered_src_node_ids))
 
     interactions_df = pd.DataFrame({
         'src_node_id': filtered_src_node_ids[:length_restrict],
