@@ -6,6 +6,7 @@ import numpy as np
 import warnings
 import json
 import torch.nn as nn
+import pickle
 
 from models.TGAT import TGAT
 from models.GraphRec import GraphRec
@@ -19,6 +20,8 @@ from evaluate_models_utils import evaluate_real
 from utils.DataLoader import get_idx_data_loader, get_link_prediction_data, get_link_prediction_data_eval
 from utils.EarlyStopping import EarlyStopping
 from utils.load_configs import get_link_prediction_args
+from utils.candidates import EmbeddingCandidateEdgeSampler
+import pandas as pd
 
 if __name__ == "__main__":
 
@@ -40,10 +43,23 @@ if __name__ == "__main__":
 
     # initialize negative samplers, set seeds for validation and testing so negatives are the same across different runs
     # in the inductive setting, negatives are sampled only amongst other new nodes
-    if args.negative_sample_strategy == 'real':  
-        new_node_test_neg_edge_sampler = CandidateEdgeSampler(src_node_ids=full_data.src_node_ids, dst_node_ids=full_data.dst_node_ids, interact_times=full_data.node_interact_times)     
-    else:
-        raise ValueError(f'negative sample strategry should be `real`. It is {args.negative_sample_strategy}.')
+    # if args.negative_sample_strategy == 'real':  
+    #     new_node_test_neg_edge_sampler = CandidateEdgeSampler(src_node_ids=full_data.src_node_ids, dst_node_ids=full_data.dst_node_ids, interact_times=full_data.node_interact_times)     
+    # else:
+    #     raise ValueError(f'negative sample strategry should be `real`. It is {args.negative_sample_strategy}.')
+
+    
+    # Load post embeddings from parquet file which is already in DataFrame format
+    post_embeddings_path = os.path.join(os.path.expanduser("~"), 'post_dynamic_embeddings.parquet')
+    post_embeddings = pd.read_parquet(post_embeddings_path)
+        
+    # Create the embedding-based candidate sampler
+    new_node_test_neg_edge_sampler = EmbeddingCandidateEdgeSampler(
+        user_dynamic_features=dynamic_user_features,
+        post_embeddings=post_embeddings,
+        n_candidates=2000,  # Adjust as needed
+        seed=1  # Use same seed for reproducibility
+    )
 
     # get data loaders
     test_idx_data_loader = get_idx_data_loader(indices_list=list(range(len(eval_test_data.src_node_ids))), batch_size=args.batch_size, shuffle=False)

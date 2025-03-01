@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv('../.env.local')
 DATA_PATH = os.getenv('DATA_PATH')
+PROCESSED_DATA_PATH = os.getenv('PROCESSED_DATA_PATH')
 DUCKDB_PATH = os.getenv('DUCKDB_PATH')
 
 
@@ -212,19 +213,20 @@ for day_num in range(total_days):
 
 print("Finished processing all dates.")
 
-with open(os.path.join(DATA_PATH, "user_dynamic_features.pkl"), "wb") as f:
+with open(os.path.join(PROCESSED_DATA_PATH, "user_dynamic_features.pkl"), "wb") as f:
     pickle.dump(user_dynamic_features, f)
 
+# Load the original user mapping
 with open(os.path.join(DATA_PATH, "user_mapping.pkl"), "rb") as file:
     user_mapping = pickle.load(file)
 
-# Replace user IDs with their mapped indices
+# Replace user IDs with their mapped indices and add 1 to match preprocessing
 user_dynamic_features_mapped = {
-    date: {user_mapping[user]: emb for user, emb in users.items()} 
+    date: {user_mapping[user] + 1: emb for user, emb in users.items() if user in user_mapping} 
     for date, users in user_dynamic_features.items()
 }
 
-print("User IDs in user_dynamic_features have been replaced with user_mapping indices.")
+print("User IDs in user_dynamic_features have been replaced with user_mapping indices + 1.")
 
-with open(os.path.join(DATA_PATH, "user_dynamic_features.pkl"), "wb") as f:
+with open(os.path.join(PROCESSED_DATA_PATH, "user_dynamic_features.pkl"), "wb") as f:
     pickle.dump(user_dynamic_features_mapped, f)
