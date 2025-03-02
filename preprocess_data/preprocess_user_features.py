@@ -160,6 +160,7 @@ def create_user_embedding(date_str, previous_embeddings=None, prev_consumer_ids=
 
 
 user_dynamic_features = {}
+producer_dynamic_features = {}  # Add this new dictionary to store producer embeddings
 # Define start and end dates
 start_date = datetime.strptime("2023-03-15", "%Y-%m-%d")
 end_date = datetime.strptime("2023-06-30", "%Y-%m-%d")
@@ -200,6 +201,7 @@ for day_num in range(total_days):
 
     # Initialize dictionary for the current date
     user_dynamic_features[date_int] = {}
+    producer_dynamic_features[date_int] = {}  # Initialize producer dictionary for current date
 
     # Process users
     for _, row in likes_df.iterrows():
@@ -207,14 +209,23 @@ for day_num in range(total_days):
             user_dynamic_features[date_int][row['userId']] = consumer_embeddings[consumer_to_idx[row['userId']]]
         except KeyError:  # Skip users not found in consumer_to_idx
             user_dynamic_features[date_int][row['userId']] = np.zeros(embedding_dim)
+    
+    # Process producers - add all producers with embeddings to the dictionary
+    for producer_id, idx in producer_to_idx.items():
+        producer_dynamic_features[date_int][producer_id] = producer_embeddings[idx]
 
     # Move to the next day
     current_date += timedelta(days=1)
 
 print("Finished processing all dates.")
 
+# Save the consumer embeddings (user_dynamic_features)
 with open(os.path.join(PROCESSED_DATA_PATH, "user_dynamic_features.pkl"), "wb") as f:
     pickle.dump(user_dynamic_features, f)
+
+# Save the producer embeddings
+with open(os.path.join(PROCESSED_DATA_PATH, "producer_dynamic_features.pkl"), "wb") as f:
+    pickle.dump(producer_dynamic_features, f)
 
 # Load the original user mapping
 with open(os.path.join(DATA_PATH, "user_mapping.pkl"), "rb") as file:
@@ -226,7 +237,17 @@ user_dynamic_features_mapped = {
     for date, users in user_dynamic_features.items()
 }
 
+# Do the same for producer embeddings
+producer_dynamic_features_mapped = {
+    date: {user_mapping[user] + 1: emb for user, emb in producers.items() if user in user_mapping} 
+    for date, producers in producer_dynamic_features.items()
+}
+
 print("User IDs in user_dynamic_features have been replaced with user_mapping indices + 1.")
+print("User IDs in producer_dynamic_features have been replaced with user_mapping indices + 1.")
 
 with open(os.path.join(PROCESSED_DATA_PATH, "user_dynamic_features.pkl"), "wb") as f:
     pickle.dump(user_dynamic_features_mapped, f)
+
+with open(os.path.join(PROCESSED_DATA_PATH, "producer_dynamic_features.pkl"), "wb") as f:
+    pickle.dump(producer_dynamic_features_mapped, f)
