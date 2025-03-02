@@ -101,7 +101,8 @@ df['embedding_date'] = df['timestamp'].dt.date
 # Prepare data for processing
 logger.info("Preparing data...")
 df = df.sort_values(['i', 'timestamp'])  # Sort by post and time
-df = df[(df['timestamp'] >= '2023-03-15') & (df['timestamp'] <= '2023-03-22')]  # Filter by time range
+# df = df[(df['timestamp'] >= '2023-03-15') & (df['timestamp'] <= '2023-03-22')]  # Filter by time range
+df = df[(df['timestamp'] >= '2023-06-01')]
 grouped_posts = df.groupby('i')  # Group by post ID (already mapped)
 
 # Initialize list to store embedding results
@@ -114,63 +115,67 @@ skipped_posts = 0
 initial_embeddings_count = 0
 missing_creator_count = 0
 
-# First, add initial post embeddings where possible
-logger.info("Adding initial post embeddings...")
+# Process each post's interactions
+logger.info("Processing posts...")
 embedding_dim = 64  # Adjust based on your actual embedding dimension
 
-# Get all unique post IDs from the interaction data
-all_post_ids = df['i'].unique()
-
-for post_id in tqdm(all_post_ids):
-    # Find the creator for this post
-    creator_info = post_creators.get(post_id)
-    
-    if creator_info is None:
-        missing_creator_count += 1
-        continue
-    
-    # Unpack creator ID and creation date
-    creator_id, created_at = creator_info
-    creation_date = created_at.date()  # Get just the date part
-    
-    # Find the closest date in dynamic features
-    if creation_date in date_to_timestamp:
-        date_timestamp = date_to_timestamp[creation_date]
-        
-        # Track embedding source
-        embedding_source = "zero"
-        
-        # Try to get the producer embedding first
-        if creator_id in producer_dynamic_features.get(date_timestamp, {}):
-            initial_embedding = producer_dynamic_features[date_timestamp][creator_id]
-            embedding_source = "producer"
-        # Fall back to consumer embedding
-        elif creator_id in user_dynamic_features.get(date_timestamp, {}):
-            initial_embedding = user_dynamic_features[date_timestamp][creator_id]
-            embedding_source = "consumer"
-        else:
-            # If no embedding found, use zeros
-            initial_embedding = np.zeros(embedding_dim, dtype=np.float32)
-            embedding_source = "zero"
-            
-        all_embeddings.append({
-            'post_id': int(post_id),
-            'user_id': creator_id,  # Creator user ID
-            'timestamp': created_at,  # Use actual creation timestamp
-            'embedding': initial_embedding.astype(np.float32),
-            'num_interactions': 0,  # 0 indicates initial embedding
-            'embedding_source': embedding_source  # Add source information
-        })
-        initial_embeddings_count += 1
-
-logger.info(f"Added {initial_embeddings_count} initial post embeddings")
-logger.info(f"Missing creators for {missing_creator_count} posts")
-
-# Process each post's interactions
-logger.info("Processing post interactions...")
 for post_id, post_interactions in tqdm(grouped_posts):
     try:
-        # Get all interactions
+        # Sort interactions by timestamp to ensure chronological order
+        post_interactions = post_interactions.sort_values('timestamp')
+        
+        # Initialize running average variables
+        running_sum = None
+        count = 0
+        
+        # Get the initial embedding for this post if available
+        creator_info = post_creators.get(post_id)
+        initial_embedding = None
+        embedding_source = None
+        
+        if creator_info:
+            creator_id, created_at = creator_info
+            creation_date = created_at.date()
+            
+            if creation_date in date_to_timestamp:
+                date_timestamp = date_to_timestamp[creation_date]
+                
+                # Try to get the producer embedding first
+                if creator_id in producer_dynamic_features.get(date_timestamp, {}):
+                    initial_embedding = producer_dynamic_features[date_timestamp][creator_id]
+                    embedding_source = "producer"
+                # Fall back to consumer embedding
+                elif creator_id in user_dynamic_features.get(date_timestamp, {}):
+                    initial_embedding = user_dynamic_features[date_timestamp][creator_id]
+                    embedding_source = "consumer"
+                else:
+                    # If no embedding found, use zeros
+                    initial_embedding = np.zeros(embedding_dim, dtype=np.float32)
+                    embedding_source = "zero"
+                
+                # Initialize running sum with initial embedding
+                if initial_embedding is not None:
+                    running_sum = initial_embedding.copy()
+                    count = 1
+                    
+                    # Add the initial embedding to the results
+                    all_embeddings.append({
+                        'post_id': int(post_id),
+                        'user_id': creator_id,
+                        'timestamp': created_at,
+                        'embedding': initial_embedding.astype(np.float32),
+                        'num_interactions': 0,  # 0 interactions
+                        'embedding_source': embedding_source
+                    })
+                    initial_embeddings_count += 1
+        else:
+            missing_creator_count += 1
+        
+        # Initialize running sum if not already done
+        if running_sum is None:
+            running_sum = np.zeros(embedding_dim, dtype=np.float32)
+        
+        # Process each interaction in chronological order
         for i, row in post_interactions.iterrows():
             try:
                 user_id = int(row['u'])  # User ID from processed data
@@ -184,13 +189,20 @@ for post_id, post_interactions in tqdm(grouped_posts):
                         # Get user embedding for this interaction
                         user_embedding = user_dynamic_features[date_timestamp][user_id]
                         
+                        # Update running sum and count
+                        running_sum += user_embedding
+                        count += 1
+                        
+                        # Calculate average using running sum
+                        avg_embedding = running_sum / count
+                        
                         all_embeddings.append({
                             'post_id': int(post_id),
                             'user_id': user_id,
                             'timestamp': row['timestamp'],
-                            'embedding': user_embedding.astype(np.float32),
-                            'num_interactions': 1,  # Single interaction
-                            'embedding_source': 'consumer'  # All interactions use consumer embeddings
+                            'embedding': avg_embedding.astype(np.float32),
+                            'num_interactions': count - (1 if initial_embedding is not None else 0),  # Count interactions only
+                            'embedding_source': 'avg'  # This is now an average
                         })
                     else:
                         missing_user_count += 1
@@ -206,6 +218,7 @@ for post_id, post_interactions in tqdm(grouped_posts):
 
 logger.info(f"Processed {processed_posts} posts with {missing_user_count} missing users")
 logger.info(f"Created {initial_embeddings_count} initial embeddings and {len(all_embeddings) - initial_embeddings_count} interaction embeddings")
+logger.info(f"Missing creators for {missing_creator_count} posts")
 logger.info(f"Processing completed in {time.time() - start_time:.2f} seconds")
 
 # Save as parquet

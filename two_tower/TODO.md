@@ -1,1 +1,0 @@
-[ ] Use regular embeddings instead of binary embeddings
