@@ -87,10 +87,6 @@ def reindex(df: pd.DataFrame, bipartite: bool = True):
 
     return new_df
 
-def unpack_embeddings(packed_bytes):
-    # Convert binary blob back to array and unpack bits
-    return np.unpackbits(np.frombuffer(packed_bytes, dtype=np.uint8))[:128]
-
 def preprocess_data(dataset_name: str, bipartite: bool = True, node_feat_dim: int = 128, edge_feat_dim: int = 10):
     """
     preprocess the data

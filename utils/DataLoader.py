@@ -82,27 +82,22 @@ def get_link_prediction_data(dataset_name: str, val_ratio: float, test_ratio: fl
     edge_raw_features = np.load('./processed_data/{}/ml_{}.npy'.format(dataset_name, dataset_name))
     node_raw_features = np.load('./processed_data/{}/ml_{}_node.npy'.format(dataset_name, dataset_name))
 
-    dynamic_user_features_path = '/home/sgan/private/DyGLib/DG_data/bluesky/user_dynamic_features.pkl'
     dynamic_user_features_path = './DG_data/bluesky/user_dynamic_features.pkl'
     with open(dynamic_user_features_path, "rb") as file:
         dynamic_user_features = pickle.load(file)
+    # adding a placeholder
+    dynamic_post_features = np.load('/home/sgan/post_dynamic_embeddings_shifted.npy')
+    zeros_64 = np.zeros((1, 64))
 
-    # # Stage 1: Initial data load
-    # with open('stage1_initial_data.txt', 'w') as f:
-    #     f.write("=== Initial Raw Data ===\n")
-    #     f.write("graph_df: ml_bluesky.csv\n")
-    #     f.write(f"graph_df Shape: {graph_df.shape}\n")
-    #     f.write(f"graph_df Head:\n{graph_df.head()}\n\n")
-    #     f.write(f"edge_raw_features: ml_bluesky.npy\n")
-    #     f.write(f"edge_raw_features Shape: {edge_raw_features.shape}\n")
-    #     f.write(f"edge_raw_features First 5 rows:\n{edge_raw_features[:5]}\n\n")
-    #     f.write(f"node_raw_features: ml_bluesky_node.npy\n")
-    #     f.write(f"node_raw_features Shape: {node_raw_features.shape}\n")
-    #     f.write(f"node_raw_features First 5 rows:\n{node_raw_features[:5]}\n\n")
-    #     f.write(f"dynamic_user_features: bluesky/user_dynamic_features.pkl\n")
-    #     f.write(f"dynamic_user_features Shape: {len(dynamic_user_features)}\n")
-    #     items_list = list(dynamic_user_features.items())[:20]
-    #     f.write(f"dynamic_user_features First 20 rows:\n{items_list}\n\n")
+    # Prepend the zeros row
+    dynamic_post_features = np.concatenate((zeros_64, dynamic_post_features), axis=0)
+
+    # print(type(dynamic_post_features))
+    # print(dynamic_post_features.shape)
+    # print(len(graph_df))
+    # print(graph_df.tail())
+    # print(graph_df['idx'].min())
+    # raise ValueError()
 
     NODE_FEAT_DIM = EDGE_FEAT_DIM = 128
 
@@ -117,14 +112,6 @@ def get_link_prediction_data(dataset_name: str, val_ratio: float, test_ratio: fl
         edge_zero_padding = np.zeros((edge_raw_features.shape[0], EDGE_FEAT_DIM - edge_raw_features.shape[1]))
         edge_raw_features = np.concatenate([edge_raw_features, edge_zero_padding], axis=1)
 
-    # # Stage 2: After padding
-    # with open('stage2_after_padding.txt', 'w') as f:
-    #     f.write("=== After Feature Padding ===\n")
-    #     f.write(f"node_raw_features Shape: {node_raw_features.shape}\n")
-    #     f.write(f"node_raw_features First 5 rows:\n{node_raw_features[:5]}\n\n")
-    #     f.write(f"edge_raw_features Shape: {edge_raw_features.shape}\n")
-    #     f.write(f"edge_raw_features First 5 rows:\n{edge_raw_features[:5]}\n")
-
     assert NODE_FEAT_DIM == node_raw_features.shape[1] and EDGE_FEAT_DIM == edge_raw_features.shape[1], 'Unaligned feature dimensions after feature padding!'
     
     # get the timestamp of validate and test set
@@ -138,19 +125,9 @@ def get_link_prediction_data(dataset_name: str, val_ratio: float, test_ratio: fl
     edge_ids = graph_df.idx.values.astype(np.int32)
     node_interact_times = graph_df.ts.values.astype(np.float64)
     labels = graph_df.label.values.astype(np.int8)
-    idx = graph_df.idx.values.astype(np.int32)
+    idx = graph_df.idx.values.astype(np.int32) - 1
     src_max_id = np.max(src_node_ids)
 
-    # # Stage 3: After array extraction
-    # with open('stage3_extracted_arrays.txt', 'w') as f:
-    #     f.write("=== Extracted Arrays ===\n")
-    #     f.write(f"Split Times - Val: {val_time}, Test: {test_time}\n\n")
-    #     f.write(f"src_node_ids (shape: {src_node_ids.shape}):\n{src_node_ids[:20]}\n\n")
-    #     f.write(f"dst_node_ids (shape: {dst_node_ids.shape}):\n{dst_node_ids[:20]}\n\n")
-    #     f.write(f"edge_ids (shape: {edge_ids.shape}):\n{edge_ids[:20]}\n\n")
-    #     f.write(f"node_interact_times (shape: {node_interact_times.shape}):\n{node_interact_times[:20]}\n\n")
-    #     f.write(f"labels (shape: {labels.shape}):\n{labels[:20]}\n\n")
-    #     f.write(f"src_max_id: {src_max_id}\n")
 
     full_data = Data(src_node_ids=src_node_ids, dst_node_ids=dst_node_ids, node_interact_times=node_interact_times, edge_ids=edge_ids, labels=labels, idx=idx, src_max_id=src_max_id)
 
@@ -164,15 +141,6 @@ def get_link_prediction_data(dataset_name: str, val_ratio: float, test_ratio: fl
     )
     sorted_test_node_list = sorted(test_node_set)
     new_test_node_set = set(random.sample(sorted_test_node_list, int(0.1 * num_total_unique_node_ids)))
-
-    # # Stage 4: After node set creation
-    # with open('stage4_node_sets.txt', 'w') as f:
-    #     f.write("=== Node Sets ===\n")
-    #     f.write(f"num_total_unique_node_ids: {num_total_unique_node_ids}\n")
-    #     f.write(f"len(test_node_set): {len(test_node_set)}\n")
-    #     f.write(f"Sorted Sample of Test Node Set (first 20):\n{sorted(list(test_node_set))[:20]}\n\n")
-    #     f.write(f"len(new_test_node_set): {len(new_test_node_set)}\n")
-    #     f.write(f"Sorted Sample of New Test Node Set (first 20):\n{sorted(list(new_test_node_set))[:20]}\n")
 
     new_test_source_mask = graph_df.u.map(lambda x: x in new_test_node_set).values
     new_test_destination_mask = graph_df.i.map(lambda x: x in new_test_node_set).values
@@ -213,26 +181,7 @@ def get_link_prediction_data(dataset_name: str, val_ratio: float, test_ratio: fl
                               edge_ids=edge_ids[new_node_test_mask], labels=labels[new_node_test_mask], 
                               idx=idx[new_node_test_mask], src_max_id=src_max_id)
 
-    # # Stage 5: Final splits
-    # with open('stage5_final_splits.txt', 'w') as f:
-    #     f.write("=== Final Dataset Splits ===\n")
-    #     for name, data in [
-    #         ("Full", full_data),
-    #         ("Train", train_data), 
-    #         ("Val", val_data),
-    #         ("Test", test_data),
-    #         ("New Node Val", new_node_val_data),
-    #         ("New Node Test", new_node_test_data)
-    #     ]:
-    #         f.write(f"\n{name} Dataset:\n")
-    #         f.write(f"num_interactions: {data.num_interactions}\n")
-    #         f.write(f"num_unique_nodes: {data.num_unique_nodes}\n")
-    #         f.write(f"First 5 src_node_ids: {data.src_node_ids[:5]}\n")
-    #         f.write(f"First 5 dst_node_ids: {data.dst_node_ids[:5]}\n")
-    #         f.write(f"First 5 node_interact_times: {data.node_interact_times[:5]}\n")
-    #         f.write(f"First 5 labels: {data.labels[:5]}\n\n")
-
-    return node_raw_features, edge_raw_features, full_data, train_data, val_data, test_data, new_node_val_data, new_node_test_data, dynamic_user_features
+    return node_raw_features, edge_raw_features, full_data, train_data, val_data, test_data, new_node_val_data, new_node_test_data, dynamic_user_features, dynamic_post_features
 
 
 def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_ratio: float):
@@ -360,6 +309,10 @@ def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_rati
         idx=last_interactions['idx'].values,
         src_max_id=src_max_id
     )
+
+    print('earliest time:', min(last_interactions['node_interact_time'].values))
+    print('number of users:', len(np.unique(last_interactions['src_node_id'].values)))
+    
 
     print("The dataset has {} interactions, involving {} different nodes".format(full_data.num_interactions, full_data.num_unique_nodes))
     print("The new node test dataset has {} interactions, involving {} different nodes".format(

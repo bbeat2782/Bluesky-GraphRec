@@ -59,6 +59,10 @@ python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMult
 python train_link_prediction.py --dataset_name bluesky --model_name TGAT --num_runs 5 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_neighbors 10 --num_layers 2 --seed 42
 ```
 
+```{bash}
+python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 5 --num_runs 5 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2 --walk_length 2 --num_neighbors 10 --seed 84
+```
+
 #### Model Evaluation
 * Evaluating *GraphRec* with posts that received at least one like in the last 20 minutes as candidate generation on *Bluesky* dataset:
 
@@ -99,4 +103,10 @@ We are grateful to the authors of
   journal={Advances in Neural Information Processing Systems},
   year={2023}
 }
+```
+
+
+
+```{bash}
+python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 5 --num_runs 5 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2 --walk_length 2 --num_neighbors 10 --seed 100
 ```

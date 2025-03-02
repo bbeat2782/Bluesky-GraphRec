@@ -163,7 +163,7 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                         src_node_ids=batch_src_ids,
                         dst_node_ids=batch_candidates,
                         node_interact_times=batch_interact_times,
-                        batch_src_idx=batch_idx
+                        batch_idx=batch_idx
                     )
                 elif model_name == 'TGAT':
                     # Compute embeddings in one operation
@@ -316,7 +316,7 @@ def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_s
                     model[0].compute_src_dst_node_temporal_embeddings(src_node_ids=batch_src_node_ids,
                                                                       dst_node_ids=batch_dst_node_ids,
                                                                       node_interact_times=batch_node_interact_times,
-                                                                      batch_src_idx=batch_src_idx)
+                                                                      batch_idx=batch_src_idx)
 
             
                 # Flatten negative samples to compute embeddings properly
@@ -331,7 +331,7 @@ def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_s
                     model[0].compute_src_dst_node_temporal_embeddings(src_node_ids=batch_neg_src_node_ids_flat,
                                                                       dst_node_ids=batch_neg_dst_node_ids_flat,
                                                                       node_interact_times=batch_neg_times_flat,
-                                                                      batch_src_idx=batch_neg_src_idx_flat)
+                                                                      batch_idx=batch_neg_src_idx_flat)
 
                 # Reshape back to (batch_size, 4, node_feat_dim) so that each positive has 4 negatives
                 node_feat_dim = batch_neg_src_node_embeddings.shape[1]  # Get feature dimension

@@ -8,12 +8,15 @@ from utils.utils import NeighborSampler
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import time
 
+import datetime
+
+
 class GraphRecMultiCo(nn.Module):
 
     def __init__(self, node_raw_features: np.ndarray, neighbor_sampler: NeighborSampler,
                  time_feat_dim: int, channel_embedding_dim: int, patch_size: int = 1, num_layers: int = 2, num_heads: int = 2,
                  dropout: float = 0.1, max_input_sequence_length: int = 512, device: str = 'cpu', max_user_feature_dim=2,
-                 user_dynamic_features=None, src_max_id=None, walk_length=2, num_neighbors=8):
+                 user_dynamic_features=None, post_dynamic_features=None, src_max_id=None, walk_length=2, num_neighbors=8):
         """
         GraphRec model.
         :param node_raw_features: ndarray, shape (num_nodes + 1, node_feat_dim)
@@ -30,6 +33,7 @@ class GraphRecMultiCo(nn.Module):
         super(GraphRecMultiCo, self).__init__()
 
         self.node_raw_features = torch.from_numpy(node_raw_features.astype(np.float16)).to(device)
+        self.post_dynamic_features = torch.from_numpy(post_dynamic_features.astype(np.float16)).to(device)
 
         # Extract all unique dates and users
         all_dates = sorted(user_dynamic_features.keys())  # Unique dates
@@ -64,7 +68,7 @@ class GraphRecMultiCo(nn.Module):
         self.num_neighbors = num_neighbors
         self.max_cooccurrence = sum(self.num_neighbors ** i for i in range(1, self.walk_length + 1))
         self.neighbor_sampler = neighbor_sampler
-        self.node_feat_dim = self.node_raw_features.shape[1]
+        self.node_feat_dim = self.node_raw_features.shape[1] + 64
         self.time_feat_dim = time_feat_dim
         self.channel_embedding_dim = channel_embedding_dim
         self.patch_size = patch_size
@@ -95,23 +99,22 @@ class GraphRecMultiCo(nn.Module):
 
         self.output_layer = nn.Linear(in_features=self.num_channels * self.channel_embedding_dim, out_features=self.node_feat_dim, bias=True)
 
-    def compute_src_dst_node_temporal_embeddings(self, src_node_ids: np.ndarray, dst_node_ids: np.ndarray, node_interact_times: np.ndarray, batch_src_idx=None, is_eval=False):
+    def compute_src_dst_node_temporal_embeddings(self, src_node_ids: np.ndarray, dst_node_ids: np.ndarray, node_interact_times: np.ndarray, batch_idx=None, is_eval=False):
         """
         compute source and destination node temporal embeddings
         :param src_node_ids: ndarray, shape (batch_size, )
         :param dst_node_ids: ndarray, shape (batch_size, )
         :param node_interact_times: ndarray, shape (batch_size, )
-        :param batch_src_idx: TODO for src nodes only (for ndynamic features)
         :return:
         """
         # get the multi-hop neighbors of source and destination nodes
         # three lists to store source nodes' first-hop neighbor ids, edge ids and interaction timestamp information, with batch_size as the list length
-        src_nodes_neighbor_ids_list, src_nodes_edge_ids_list, src_nodes_neighbor_times_list = \
+        src_nodes_neighbor_ids_list, src_nodes_edge_ids_list, src_nodes_neighbor_times_list, src_nodes_neighbor_idx_list = \
             self.neighbor_sampler.get_multi_hop_neighbors(num_hops=self.walk_length, node_ids=src_node_ids,
                                                           node_interact_times=node_interact_times, num_neighbors=self.num_neighbors)
 
         # three lists to store destination nodes' first-hop neighbor ids, edge ids and interaction timestamp information, with batch_size as the list length
-        dst_nodes_neighbor_ids_list, dst_nodes_edge_ids_list, dst_nodes_neighbor_times_list = \
+        dst_nodes_neighbor_ids_list, dst_nodes_edge_ids_list, dst_nodes_neighbor_times_list, dst_nodes_neighbor_idx_list = \
             self.neighbor_sampler.get_multi_hop_neighbors(num_hops=self.walk_length, node_ids=dst_node_ids,
                                                           node_interact_times=node_interact_times, num_neighbors=self.num_neighbors)
 
@@ -121,6 +124,7 @@ class GraphRecMultiCo(nn.Module):
         src_padded_nodes_neighbor_ids = np.zeros((batch_size, self.max_cooccurrence), dtype=np.int32)
         src_padded_nodes_edge_ids = np.zeros((batch_size, self.max_cooccurrence), dtype=np.int32)
         src_padded_nodes_neighbor_times = np.zeros((batch_size, self.max_cooccurrence), dtype=np.float32)
+        src_padded_nodes_neighbor_idx = np.zeros((batch_size, self.max_cooccurrence), dtype=np.int32)
         
         # Stack first-hop and second-hop neighbors efficiently
         src_padded_nodes_neighbor_ids[:, :self.num_neighbors] = np.stack(src_nodes_neighbor_ids_list[0])
@@ -131,11 +135,15 @@ class GraphRecMultiCo(nn.Module):
         
         src_padded_nodes_neighbor_times[:, :self.num_neighbors] = np.stack(src_nodes_neighbor_times_list[0])
         src_padded_nodes_neighbor_times[:, self.num_neighbors:] = np.stack(src_nodes_neighbor_times_list[1])
+
+        src_padded_nodes_neighbor_idx[:, :self.num_neighbors] = np.stack(src_nodes_neighbor_idx_list[0])
+        src_padded_nodes_neighbor_idx[:, self.num_neighbors:] = np.stack(src_nodes_neighbor_idx_list[1])
         
         # Repeat for destination nodes
         dst_padded_nodes_neighbor_ids = np.zeros((batch_size, self.max_cooccurrence), dtype=np.int32)
         dst_padded_nodes_edge_ids = np.zeros((batch_size, self.max_cooccurrence), dtype=np.int32)
         dst_padded_nodes_neighbor_times = np.zeros((batch_size, self.max_cooccurrence), dtype=np.float32)
+        dst_padded_nodes_neighbor_idx = np.zeros((batch_size, self.max_cooccurrence), dtype=np.int32)
         
         dst_padded_nodes_neighbor_ids[:, :self.num_neighbors] = np.stack(dst_nodes_neighbor_ids_list[0])
         dst_padded_nodes_neighbor_ids[:, self.num_neighbors:] = np.stack(dst_nodes_neighbor_ids_list[1])
@@ -145,6 +153,9 @@ class GraphRecMultiCo(nn.Module):
         
         dst_padded_nodes_neighbor_times[:, :self.num_neighbors] = np.stack(dst_nodes_neighbor_times_list[0])
         dst_padded_nodes_neighbor_times[:, self.num_neighbors:] = np.stack(dst_nodes_neighbor_times_list[1])
+
+        dst_padded_nodes_neighbor_idx[:, :self.num_neighbors] = np.stack(dst_nodes_neighbor_idx_list[0])
+        dst_padded_nodes_neighbor_idx[:, self.num_neighbors:] = np.stack(dst_nodes_neighbor_idx_list[1])
         
         # src_padded_nodes_neighbor_co_occurrence_features, Tensor, shape (batch_size, src_max_seq_length, neighbor_co_occurrence_feat_dim)
         # dst_padded_nodes_neighbor_co_occurrence_features, Tensor, shape (batch_size, dst_max_seq_length, neighbor_co_occurrence_feat_dim)
@@ -157,13 +168,15 @@ class GraphRecMultiCo(nn.Module):
         # src_padded_nodes_neighbor_time_features, Tensor, shape (batch_size, src_max_seq_length, time_feat_dim)
         src_padded_nodes_neighbor_node_raw_features, src_padded_nodes_neighbor_time_features = \
             self.get_features(node_interact_times=node_interact_times, padded_nodes_neighbor_ids=src_padded_nodes_neighbor_ids,
-                              padded_nodes_edge_ids=src_padded_nodes_edge_ids, padded_nodes_neighbor_times=src_padded_nodes_neighbor_times, time_encoder=self.time_encoder)
+                              padded_nodes_edge_ids=src_padded_nodes_edge_ids, padded_nodes_neighbor_times=src_padded_nodes_neighbor_times, time_encoder=self.time_encoder,
+                              padded_nodes_neighbor_idx=src_padded_nodes_neighbor_idx)
 
         # dst_padded_nodes_neighbor_node_raw_features, Tensor, shape (batch_size, dst_max_seq_length, node_feat_dim)
         # dst_padded_nodes_neighbor_time_features, Tensor, shape (batch_size, dst_max_seq_length, time_feat_dim)
         dst_padded_nodes_neighbor_node_raw_features, dst_padded_nodes_neighbor_time_features = \
             self.get_features(node_interact_times=node_interact_times, padded_nodes_neighbor_ids=dst_padded_nodes_neighbor_ids,
-                              padded_nodes_edge_ids=dst_padded_nodes_edge_ids, padded_nodes_neighbor_times=dst_padded_nodes_neighbor_times, time_encoder=self.time_encoder)
+                              padded_nodes_edge_ids=dst_padded_nodes_edge_ids, padded_nodes_neighbor_times=dst_padded_nodes_neighbor_times, time_encoder=self.time_encoder,
+                              padded_nodes_neighbor_idx=dst_padded_nodes_neighbor_idx)
 
         # get the patches for source and destination nodes
         # src_patches_nodes_neighbor_node_raw_features, Tensor, shape (batch_size, src_num_patches, patch_size * node_feat_dim)
@@ -287,7 +300,7 @@ class GraphRecMultiCo(nn.Module):
 
 
     def get_features(self, node_interact_times: np.ndarray, padded_nodes_neighbor_ids: np.ndarray, padded_nodes_edge_ids: np.ndarray,
-                     padded_nodes_neighbor_times: np.ndarray, time_encoder: TimeEncoder):
+                     padded_nodes_neighbor_times: np.ndarray, time_encoder: TimeEncoder, padded_nodes_neighbor_idx):
         """
         get node, edge and time features
         :param node_interact_times: ndarray, shape (batch_size, )
@@ -298,15 +311,23 @@ class GraphRecMultiCo(nn.Module):
         :param time_encoder: TimeEncoder, time encoder
         :return:
         """
+        
         # Tensor, shape (batch_size, max_seq_length, time_feat_dim)
         padded_nodes_neighbor_time_features = time_encoder(timestamps=torch.from_numpy(node_interact_times[:, np.newaxis] - padded_nodes_neighbor_times).float().to(self.device))
 
         # ndarray, set the time features to all zeros for the padded timestamp
         padded_nodes_neighbor_time_features[torch.from_numpy(padded_nodes_neighbor_ids == 0)] = 0.0
 
+        
+        # Compute seconds since the start of the day
+        seconds_since_midnight = padded_nodes_neighbor_times % 86400  # 86400 seconds in a day
+        
+        # Compute the corresponding midnight timestamp
+        midnight_unix_times = padded_nodes_neighbor_times - seconds_since_midnight  # Subtract all time components
+        
         # Convert NumPy arrays to PyTorch tensors (on GPU)
         padded_nodes_neighbor_ids = torch.tensor(padded_nodes_neighbor_ids, dtype=torch.int64, device=self.device)
-        padded_nodes_neighbor_times = torch.tensor(padded_nodes_neighbor_times, dtype=torch.int64, device=self.device)
+        padded_nodes_neighbor_times = torch.tensor(midnight_unix_times, dtype=torch.int64, device=self.device)
     
         # Boolean mask for valid user nodes
         mask = padded_nodes_neighbor_ids <= self.src_max_id  # Shape: (batch_size, max_seq_length)
@@ -363,8 +384,23 @@ class GraphRecMultiCo(nn.Module):
             padded_nodes_neighbor_node_raw_features.index_put_(
                 (valid_indices[0], valid_indices[1]), user_embeddings_padded
             )
- 
-        return padded_nodes_neighbor_node_raw_features.float(), padded_nodes_neighbor_time_features
+
+        post_mask = padded_nodes_neighbor_ids > self.src_max_id
+        post_dynamic_features = self.post_dynamic_features[torch.from_numpy(padded_nodes_neighbor_idx)]
+
+        # Create a zero tensor of shape (512, 110, 64) on the correct device
+        zero_vector = torch.zeros_like(post_dynamic_features, dtype=post_dynamic_features.dtype, device=self.device)
+        
+        # Expand post_mask to match last dimension (64)
+        post_mask_expanded = post_mask.unsqueeze(-1)  # Shape: (512, 110, 1)
+        
+        # Use torch.where to replace with zero where post_mask is False
+        final_post_features = torch.where(post_mask_expanded, post_dynamic_features, zero_vector)
+
+        # Concatenate along the last dimension (feature axis)
+        concatenated_features = torch.cat([padded_nodes_neighbor_node_raw_features, final_post_features], dim=-1)
+        
+        return concatenated_features.float(), padded_nodes_neighbor_time_features
 
 
     def get_patches(self, padded_nodes_neighbor_node_raw_features: torch.Tensor, padded_nodes_neighbor_time_features: torch.Tensor,

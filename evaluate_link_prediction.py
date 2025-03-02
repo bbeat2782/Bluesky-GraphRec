@@ -33,6 +33,10 @@ if __name__ == "__main__":
     # get data for training, validation and testing
     node_raw_features, edge_raw_features, full_data, test_data, eval_test_data, dynamic_user_features = \
         get_link_prediction_data_eval(dataset_name=args.dataset_name, val_ratio=args.val_ratio, test_ratio=args.test_ratio)
+
+    print(eval_test_data.dst_node_ids.max())
+    print(eval_test_data.dst_node_ids.min())
+    raise ValueError()
     
     # initialize validation and test neighbor sampler to retrieve temporal graph
     full_neighbor_sampler = get_neighbor_sampler(data=full_data, sample_neighbor_strategy=args.sample_neighbor_strategy,
