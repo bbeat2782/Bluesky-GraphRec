@@ -16,6 +16,15 @@ import hashlib
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
+os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+torch.manual_seed(42)
+torch.cuda.manual_seed(42)
+torch.cuda.manual_seed_all(42)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+np.random.seed(42)
+torch.use_deterministic_algorithms(True)
+
 # Load environment variables
 load_dotenv('../.env.local')
 DATA_PATH = os.getenv('DATA_PATH')
@@ -57,7 +66,6 @@ def update_mapping(mapping, new_items):
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 con = duckdb.connect(DUCKDB_PATH)
-torch.manual_seed(42)  # IMPORTANT: temporary solution for deterministic results. Need this so that consumer_embeddings stays the same across runs.
 
 def create_user_embedding(date_str, previous_embeddings=None, prev_consumer_ids=None):
     train_producer_df = con.execute(f"""
@@ -164,6 +172,7 @@ producer_dynamic_features = {}  # Add this new dictionary to store producer embe
 # Define start and end dates
 start_date = datetime.strptime("2023-03-15", "%Y-%m-%d")
 end_date = datetime.strptime("2023-06-30", "%Y-%m-%d")
+# end_date = datetime.strptime("2023-03-15", "%Y-%m-%d")
 embedding_dim=64
 
 # Calculate total number of days

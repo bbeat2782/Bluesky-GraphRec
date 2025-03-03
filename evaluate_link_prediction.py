@@ -7,6 +7,7 @@ import warnings
 import json
 import torch.nn as nn
 import pickle
+import pandas as pd
 
 from models.TGAT import TGAT
 from models.GraphRec import GraphRec
@@ -21,7 +22,6 @@ from utils.DataLoader import get_idx_data_loader, get_link_prediction_data, get_
 from utils.EarlyStopping import EarlyStopping
 from utils.load_configs import get_link_prediction_args
 from utils.candidates import EmbeddingCandidateEdgeSampler
-import pandas as pd
 
 if __name__ == "__main__":
 
@@ -44,14 +44,26 @@ if __name__ == "__main__":
     # initialize negative samplers, set seeds for validation and testing so negatives are the same across different runs
     # in the inductive setting, negatives are sampled only amongst other new nodes
     if args.negative_sample_strategy == 'real':  
-        new_node_test_neg_edge_sampler = CandidateEdgeSampler(src_node_ids=full_data.src_node_ids, dst_node_ids=full_data.dst_node_ids, interact_times=full_data.node_interact_times)     
-    else:
-        raise ValueError(f'negative sample strategry should be `real`. It is {args.negative_sample_strategy}.')
-    
-    # # Load post embeddings from parquet file which is already in DataFrame format
-    # post_embeddings_path = os.path.join(os.path.expanduser("~"), 'post_dynamic_embeddings.parquet')
-    # post_embeddings = pd.read_parquet(post_embeddings_path)
+        # new_node_test_neg_edge_sampler = CandidateEdgeSampler(src_node_ids=full_data.src_node_ids, dst_node_ids=full_data.dst_node_ids, interact_times=full_data.node_interact_times)     
+        # Load post embeddings from pickle file which is in list format
+        dynamic_user_features_path = './processed_data/bluesky/user_dynamic_features.pkl' # changed from DG_data
+        with open(dynamic_user_features_path, "rb") as file:
+            dynamic_user_features = pickle.load(file)
 
+        post_embeddings_path = os.path.join(os.path.expanduser("~"), 'post_dynamic_embeddings.parquet')
+        post_embeddings_df = pd.read_parquet(post_embeddings_path)
+        
+        # Initialize with embedding-based candidate sampler instead of heuristic sampler
+        new_node_test_neg_edge_sampler = EmbeddingCandidateEdgeSampler(
+            user_dynamic_features=dynamic_user_features,
+            post_embeddings_df=post_embeddings_df,
+            time_window_hours=args.time_window_hours if hasattr(args, 'time_window_hours') else 24,
+            n_candidates=args.n_candidates if hasattr(args, 'n_candidates') else 1000,
+            seed=args.seed
+        )    
+    else:
+        raise ValueError(f'negative sample strategy should be `real`. It is {args.negative_sample_strategy}.')
+    
     # get data loaders
     test_idx_data_loader = get_idx_data_loader(indices_list=list(range(len(eval_test_data.src_node_ids))), batch_size=args.batch_size, shuffle=False)
 
