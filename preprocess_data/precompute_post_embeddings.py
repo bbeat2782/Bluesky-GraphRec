@@ -170,7 +170,7 @@ for post_id, post_interactions in tqdm(grouped_posts):
                     initial_embeddings_count += 1
         else:
             missing_creator_count += 1
-        
+
         # Initialize running sum if not already done
         if running_sum is None:
             running_sum = np.zeros(embedding_dim, dtype=np.float16)

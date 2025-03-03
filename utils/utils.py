@@ -190,6 +190,7 @@ class NeighborSampler:
         # each entry in position (i,j) represents the interaction time between src node node_ids[i] and dst node nodes_neighbor_ids[i][j], before node_interact_times[i]
         # ndarray, shape (batch_size, num_neighbors)
         nodes_neighbor_times = np.zeros((len(node_ids), num_neighbors)).astype(np.float32)
+        nodes_neighbor_idx = np.zeros((len(node_ids), num_neighbors)).astype(np.int32)
 
         # extracts all neighbors ids, edge ids and interaction times of nodes in node_ids, which happened before the corresponding time in node_interact_times
         for idx, (node_id, node_interact_time) in enumerate(zip(node_ids, node_interact_times)):
@@ -227,16 +228,18 @@ class NeighborSampler:
                     node_neighbor_ids = node_neighbor_ids[-num_neighbors:]
                     node_edge_ids = node_edge_ids[-num_neighbors:]
                     node_neighbor_times = node_neighbor_times[-num_neighbors:]
+                    node_neighbor_idx = node_neighbor_idx[-num_neighbors:]
 
                     # put the neighbors' information at the back positions
                     nodes_neighbor_ids[idx, num_neighbors - len(node_neighbor_ids):] = node_neighbor_ids
                     nodes_edge_ids[idx, num_neighbors - len(node_edge_ids):] = node_edge_ids
                     nodes_neighbor_times[idx, num_neighbors - len(node_neighbor_times):] = node_neighbor_times
+                    nodes_neighbor_idx[idx, num_neighbors - len(node_neighbor_idx):] = node_neighbor_idx
                 else:
                     raise ValueError(f'Not implemented error for sample_neighbor_strategy {self.sample_neighbor_strategy}!')
 
-        # three ndarrays, with shape (batch_size, num_neighbors)
-        return nodes_neighbor_ids, nodes_edge_ids, nodes_neighbor_times
+        # four ndarrays, with shape (batch_size, num_neighbors)
+        return nodes_neighbor_ids, nodes_edge_ids, nodes_neighbor_times, nodes_neighbor_idx
 
     def get_multi_hop_neighbors(self, num_hops: int, node_ids: np.ndarray, node_interact_times: np.ndarray, num_neighbors: int = 20):
         """
@@ -251,30 +254,33 @@ class NeighborSampler:
 
         # get the temporal neighbors at the first hop
         # nodes_neighbor_ids, nodes_edge_ids, nodes_neighbor_times -> ndarray, shape (batch_size, num_neighbors)
-        nodes_neighbor_ids, nodes_edge_ids, nodes_neighbor_times = self.get_historical_neighbors(node_ids=node_ids,
+        nodes_neighbor_ids, nodes_edge_ids, nodes_neighbor_times, node_neighbor_idx = self.get_historical_neighbors(node_ids=node_ids,
                                                                                                  node_interact_times=node_interact_times,
                                                                                                  num_neighbors=num_neighbors)
         # three lists to store the neighbor ids, edge ids and interaction timestamp information
         nodes_neighbor_ids_list = [nodes_neighbor_ids]
         nodes_edge_ids_list = [nodes_edge_ids]
         nodes_neighbor_times_list = [nodes_neighbor_times]
+        nodes_neighbor_idx_list = [node_neighbor_idx]
         for hop in range(1, num_hops):
             # get information of neighbors sampled at the current hop
             # three ndarrays, with shape (batch_size * num_neighbors ** hop, num_neighbors)
-            nodes_neighbor_ids, nodes_edge_ids, nodes_neighbor_times = self.get_historical_neighbors(node_ids=nodes_neighbor_ids_list[-1].flatten(),
+            nodes_neighbor_ids, nodes_edge_ids, nodes_neighbor_times, node_neighbor_idx = self.get_historical_neighbors(node_ids=nodes_neighbor_ids_list[-1].flatten(),
                                                                                                      node_interact_times=nodes_neighbor_times_list[-1].flatten(),
                                                                                                      num_neighbors=num_neighbors)
             # three ndarrays with shape (batch_size, num_neighbors ** (hop + 1))
             nodes_neighbor_ids = nodes_neighbor_ids.reshape(len(node_ids), -1)
             nodes_edge_ids = nodes_edge_ids.reshape(len(node_ids), -1)
             nodes_neighbor_times = nodes_neighbor_times.reshape(len(node_ids), -1)
+            node_neighbor_idx = node_neighbor_idx.reshape(len(node_ids), -1)
 
             nodes_neighbor_ids_list.append(nodes_neighbor_ids)
             nodes_edge_ids_list.append(nodes_edge_ids)
             nodes_neighbor_times_list.append(nodes_neighbor_times)
+            nodes_neighbor_idx_list.append(node_neighbor_idx)
 
         # tuple, each element in the tuple is a list of num_hops ndarrays, each with shape (batch_size, num_neighbors ** current_hop)
-        return nodes_neighbor_ids_list, nodes_edge_ids_list, nodes_neighbor_times_list
+        return nodes_neighbor_ids_list, nodes_edge_ids_list, nodes_neighbor_times_list, nodes_neighbor_idx_list
 
     def get_all_first_hop_neighbors(self, node_ids: np.ndarray, node_interact_times: np.ndarray):
         """

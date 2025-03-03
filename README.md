@@ -19,6 +19,7 @@ Once the installation is complete, activate the environment.
 ```
 conda activate bluesky
 ```
+
 ### **3️⃣ Install Additional Pip Packages**
 Some packages, such as torch-geometric, are installed via pip. So to ensure all packages are installed correctly, run:
 ```
@@ -52,7 +53,7 @@ python precompute_post_embeddings.py
 * Training *GraphRec* on *Bluesky* dataset:
 
 ```{bash}
-python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 5 --num_runs 5 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2 --walk_length 2 --num_neighbors 10 --seed 42
+python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 5 --num_runs 3 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2 --walk_length 2 --num_neighbors 10 --seed 100
 ```
 
 ```{bash}
@@ -63,21 +64,12 @@ python train_link_prediction.py --dataset_name bluesky --model_name TGAT --num_r
 * Evaluating *GraphRec* with posts that received at least one like in the last 20 minutes as candidate generation on *Bluesky* dataset:
 
 ```{bash}
-python evaluate_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 6 --num_runs 1 --gpu 0 --batch_size 4 --negative_sample_strategy real --num_heads 2 --walk_length 2 --num_neighbors 12 --seed 100
+python evaluate_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 5 --num_runs 3 --gpu 0 --batch_size 4 --negative_sample_strategy real --num_heads 2 --walk_length 2 --num_neighbors 10 --seed 100
 ```
 
 * Evaluating *TGAT* replaced with MLP with posts that received at least one like in the last 20 minutes as candidate generation on *Bluesky* dataset:
 ```{bash}
-python evaluate_link_prediction.py --dataset_name bluesky --model_name TGAT --num_runs 1 --gpu 0 --batch_size 4 --negative_sample_strategy real --num_neighbors 12 --num_layers 2 --num_heads 2 --seed 100
-```
-
-## Ablation Study
-```{bash}
-python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 12 --num_runs 1 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2 --walk_length 2 --num_neighbors 12 --seed 50
-```
-
-```{bash}
-python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 3 --num_runs 1 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2 --walk_length 2 --num_neighbors 12 --seed 25
+python evaluate_link_prediction.py --dataset_name bluesky --model_name TGAT --num_runs 3 --gpu 0 --batch_size 4 --negative_sample_strategy real --num_neighbors 12 --num_layers 2 --num_heads 2 --seed 42
 ```
 
 ## Acknowledgments

@@ -34,7 +34,7 @@ if __name__ == "__main__":
     args = get_link_prediction_args(is_evaluation=True)
 
     # get data for training, validation and testing
-    node_raw_features, edge_raw_features, full_data, test_data, eval_test_data, dynamic_user_features = \
+    node_raw_features, edge_raw_features, full_data, test_data, eval_test_data, dynamic_user_features, post_dynamic_features = \
         get_link_prediction_data_eval(dataset_name=args.dataset_name, val_ratio=args.val_ratio, test_ratio=args.test_ratio)
     
     # initialize validation and test neighbor sampler to retrieve temporal graph
@@ -48,22 +48,16 @@ if __name__ == "__main__":
     else:
         raise ValueError(f'negative sample strategry should be `real`. It is {args.negative_sample_strategy}.')
     
-    # # Load post embeddings from parquet file which is already in DataFrame format
-    # post_embeddings_path = os.path.join(os.path.expanduser("~"), 'post_dynamic_embeddings.parquet')
-    # post_embeddings = pd.read_parquet(post_embeddings_path)
-
     # get data loaders
     test_idx_data_loader = get_idx_data_loader(indices_list=list(range(len(eval_test_data.src_node_ids))), batch_size=args.batch_size, shuffle=False)
+    result_json = {}
 
-    new_node_test_metric_all_runs = []
-
-    # for inference, args.num_runs should be 1 if im scoring all the candidates
     for run in range(args.num_runs):
 
         set_random_seed(seed=run)
 
         # args.seed = run
-        args.load_model_name = f'{args.model_name}_seed{args.seed}'
+        args.load_model_name = f'{args.model_name}_seed{args.seed}_{run+1}'
         args.save_result_name = f'{args.negative_sample_strategy}_negative_sampling_{args.model_name}_seed{args.seed}'
 
         # set up logger
@@ -90,29 +84,20 @@ if __name__ == "__main__":
         logger.info(f'configuration is {args}')
 
         # create model
-        if args.model_name == 'GraphRec':
-            dynamic_backbone = GraphRec(node_raw_features=node_raw_features, neighbor_sampler=full_neighbor_sampler,
-                                            time_feat_dim=args.time_feat_dim, channel_embedding_dim=args.channel_embedding_dim, patch_size=args.patch_size,
-                                            num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout,
-                                            max_input_sequence_length=args.max_input_sequence_length, device=args.device, user_dynamic_features=dynamic_user_features, src_max_id=eval_test_data.src_max_id)
-        elif args.model_name == 'GraphRecMulti':
-            dynamic_backbone = GraphRecMulti(node_raw_features=node_raw_features, neighbor_sampler=full_neighbor_sampler,
-                                            time_feat_dim=args.time_feat_dim, channel_embedding_dim=args.channel_embedding_dim, patch_size=args.patch_size,
-                                            num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout,
-                                            max_input_sequence_length=args.max_input_sequence_length, device=args.device, user_dynamic_features=dynamic_user_features, src_max_id=eval_test_data.src_max_id)
-        elif args.model_name == 'GraphRecMultiCo':
+        if args.model_name == 'GraphRecMultiCo':
             dynamic_backbone = GraphRecMultiCo(node_raw_features=node_raw_features, neighbor_sampler=full_neighbor_sampler,
                                             time_feat_dim=args.time_feat_dim, channel_embedding_dim=args.channel_embedding_dim, patch_size=args.patch_size,
                                             num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout,
                                             max_input_sequence_length=args.max_input_sequence_length, device=args.device, user_dynamic_features=dynamic_user_features,
+                                            post_dynamic_features=post_dynamic_features,
                                             src_max_id=eval_test_data.src_max_id, walk_length=args.walk_length, num_neighbors=args.num_neighbors)
         elif args.model_name == 'TGAT':
             dynamic_backbone = TGAT(node_raw_features=node_raw_features, edge_raw_features=edge_raw_features, neighbor_sampler=full_neighbor_sampler,
                                     time_feat_dim=args.time_feat_dim, num_layers=args.num_layers, dropout=args.dropout, device=args.device)
         else:
             raise ValueError(f"Wrong value for model_name {args.model_name}!")
-        link_predictor = MergeLayer(input_dim1=node_raw_features.shape[1], input_dim2=node_raw_features.shape[1],
-                                    hidden_dim=node_raw_features.shape[1], output_dim=1)
+        link_predictor = MergeLayer(input_dim1=node_raw_features.shape[1]+64, input_dim2=node_raw_features.shape[1]+64,
+                                    hidden_dim=node_raw_features.shape[1]+64, output_dim=1)
         model = nn.Sequential(dynamic_backbone, link_predictor)
         logger.info(f'model -> {model}')
         logger.info(f'model name: {args.model_name}, #parameters: {get_parameter_sizes(model) * 4} B, '
@@ -130,19 +115,18 @@ if __name__ == "__main__":
         logger.info(f'get final performance on dataset {args.dataset_name}...')
 
         # the saved best model of memory-based models cannot perform validation since the stored memory has been updated by validation data
-        avg_mrr = evaluate_real(model_name=args.model_name,
-                                model=model,
-                                neighbor_sampler=full_neighbor_sampler,
-                                evaluate_idx_data_loader=test_idx_data_loader,
-                                evaluate_neg_edge_sampler=new_node_test_neg_edge_sampler,
-                                evaluate_data=eval_test_data,
-                                num_neighbors=args.num_neighbors,
-                                time_gap=args.time_gap)
-        
-        # store the evaluation metrics at the current run
-        new_node_test_metric_dict = {}
+        avg_mrr, avg_ild = evaluate_real(model_name=args.model_name,
+                                        model=model,
+                                        neighbor_sampler=full_neighbor_sampler,
+                                        evaluate_idx_data_loader=test_idx_data_loader,
+                                        evaluate_neg_edge_sampler=new_node_test_neg_edge_sampler,
+                                        evaluate_data=eval_test_data,
+                                        num_neighbors=args.num_neighbors,
+                                        time_gap=args.time_gap,
+                                        load_model_name=args.load_model_name)
 
-        logger.info(f'new node test MRR, {avg_mrr:.4f}')
+        logger.info(f'Test MRR, {avg_mrr:.4f}')
+        logger.info(f'Test ILD@10, {avg_ild:.4f}')
     
         single_run_time = time.time() - run_start_time
         logger.info(f'Run {run + 1} cost {single_run_time:.2f} seconds.')
@@ -153,16 +137,28 @@ if __name__ == "__main__":
             logger.removeHandler(ch)
 
         # save model result
-        result_json = {
-            "new node test metrics": {'MRR': f'{avg_mrr:.4f}'}
-        }
-        result_json = json.dumps(result_json, indent=4)
+        result_json[f"new node test metrics_{run+1}"] = {'MRR': avg_mrr, 'ILD@10': avg_ild}
 
-        save_result_folder = f"./saved_results/{args.model_name}/{args.dataset_name}"
-        os.makedirs(save_result_folder, exist_ok=True)
-        save_result_path = os.path.join(save_result_folder, f"{args.save_result_name}.json")
-        with open(save_result_path, 'w') as file:
-            file.write(result_json)
-        logger.info(f'save negative sampling results at {save_result_path}')
+    mrr_values = []
+    ild_values = []
+    for key in result_json:
+        # Convert the MRR value to a float (if necessary)
+        mrr_values.append(float(result_json[key]['MRR']))
+        ild_values.append(float(result_json[key]['ILD@10']))
+    
+    print("Mean MRR:", np.mean(mrr_values))
+    print("Std Dev MRR:", np.std(mrr_values))
+
+    print("Mean ILD@10:", np.mean(ild_values))
+    print("Std Dev ILD@10:", np.std(ild_values))
+    
+    result_json = json.dumps(result_json, indent=4)
+
+    save_result_folder = f"./saved_results/{args.model_name}/{args.dataset_name}"
+    os.makedirs(save_result_folder, exist_ok=True)
+    save_result_path = os.path.join(save_result_folder, f"{args.save_result_name}.json")
+    with open(save_result_path, 'w') as file:
+        file.write(result_json)
+    logger.info(f'save negative sampling results at {save_result_path}')
 
     sys.exit()
