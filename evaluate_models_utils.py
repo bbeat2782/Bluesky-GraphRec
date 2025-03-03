@@ -9,6 +9,7 @@ import argparse
 import os
 import json
 import matplotlib.pyplot as plt
+from sklearn.metrics.pairwise import cosine_distances
 
 from utils.metrics import get_link_prediction_metrics
 from utils.utils import set_random_seed
@@ -18,7 +19,7 @@ from utils.DataLoader import Data
 
 def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborSampler, evaluate_idx_data_loader: DataLoader,
                                    evaluate_neg_edge_sampler, evaluate_data: Data,
-                                   num_neighbors: int = 20, time_gap=8):
+                                   num_neighbors: int = 20, time_gap=8, load_model_name=None):
     """
     evaluate models on the link prediction task
     :param model_name: str, name of the model
@@ -111,13 +112,13 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                 batch_src_ids = np.concatenate(batch_src_ids)
                 batch_idx = np.concatenate(batch_idx)
 
-                if model_name in {'GraphRec', 'GraphRecMulti', 'GraphRecMultiCo'}:
+                if model_name == 'GraphRecMultiCo':
                     # Compute embeddings in one operation
                     src_embeddings, dst_embeddings = model[0].compute_src_dst_node_temporal_embeddings(
                         src_node_ids=batch_src_ids,
                         dst_node_ids=batch_candidates,
                         node_interact_times=batch_interact_times,
-                        batch_src_idx=batch_idx
+                        batch_idx=batch_idx
                     )
                 elif model_name == 'TGAT':
                     # Compute embeddings in one operation
@@ -144,11 +145,6 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                     post_probabilities = np.array(post_probabilities)
                     post_candidates = np.array(post_candidates)
 
-                    # print('post_probabilities', post_probabilities.shape)
-                    # print('post_candidates', post_candidates.shape)
-                    # print('src_id', src_id)
-                    # raise ValueError()
-                    
                     # Find the index of the true destination ID
                     true_dst_index = np.where(post_candidates == true_dst_id)[0]
                     
@@ -172,20 +168,39 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
 
                     recommended_posts.append(sorted_candidates.tolist()) 
 
-    # NOTE: For checking which posts are recommended. Comment this when you do not need it
+    # NOTE: For checking which posts are recommended
     # Create directory if it doesn't exist
     save_dir = f"saved_results/{model_name}/bluesky"
     os.makedirs(save_dir, exist_ok=True)
+
+    # Computing ILD@10
+    node_feat = np.load('processed_data/bluesky/ml_bluesky_node.npy')
+    k = 10  
+    ild_scores = []
+    
+    for d in recommended_posts:  # Assuming data is a dict with user IDs as keys
+        top_k = d[:k]  # Get top-k recommended items    
+        top_k_features = node_feat[top_k]  # Extract their feature vectors
+    
+        # Compute pairwise cosine distances
+        pairwise_distances = cosine_distances(top_k_features)
+    
+        # Get the upper triangle (excluding diagonal)
+        num_pairs = k * (k - 1) / 2
+        mean_distance = np.sum(pairwise_distances) / (2 * num_pairs) if num_pairs > 0 else 0
+    
+        ild_scores.append(mean_distance)
+    
+    # Compute the average ILD@k across users
+    avg_ild = np.mean(ild_scores) if ild_scores else 0
     
     # Save to JSON file
-    save_path = os.path.join(save_dir, "recommended_posts.json")
+    save_path = os.path.join(save_dir, f"{load_model_name}_recommended_posts.json")
     with open(save_path, "w") as json_file:
         json.dump(recommended_posts, json_file, indent=4)
 
     np.save(f"saved_results/{model_name}/bluesky/mrr_results.npy", np.array(mrr_results))
     avg_mrr = sum(mrr_results) / len(mrr_results)
-    
-    print(f"Mean Reciprocal Rank (MRR): {avg_mrr}")
 
     # Save the candidates_length dictionary to a JSON file
     output_dict_path = f"saved_results/{model_name}/bluesky/candidates_length.json"
@@ -208,7 +223,7 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
     plt.savefig(output_path)
     plt.close()
 
-    return avg_mrr
+    return avg_mrr, avg_ild
 
 
 def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_sampler: NeighborSampler, evaluate_idx_data_loader: DataLoader,
@@ -270,7 +285,7 @@ def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_s
                     model[0].compute_src_dst_node_temporal_embeddings(src_node_ids=batch_src_node_ids,
                                                                       dst_node_ids=batch_dst_node_ids,
                                                                       node_interact_times=batch_node_interact_times,
-                                                                      batch_src_idx=batch_src_idx)
+                                                                      batch_idx=batch_src_idx)
 
             
                 # Flatten negative samples to compute embeddings properly
@@ -285,7 +300,7 @@ def evaluate_model_link_prediction(model_name: str, model: nn.Module, neighbor_s
                     model[0].compute_src_dst_node_temporal_embeddings(src_node_ids=batch_neg_src_node_ids_flat,
                                                                       dst_node_ids=batch_neg_dst_node_ids_flat,
                                                                       node_interact_times=batch_neg_times_flat,
-                                                                      batch_src_idx=batch_neg_src_idx_flat)
+                                                                      batch_idx=batch_neg_src_idx_flat)
 
                 # Reshape back to (batch_size, 4, node_feat_dim) so that each positive has 4 negatives
                 node_feat_dim = batch_neg_src_node_embeddings.shape[1]  # Get feature dimension

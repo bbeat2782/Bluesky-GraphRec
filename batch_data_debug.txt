@@ -1,9 +1,0 @@
-batch_src_node_ids:
-[ 947  960  994 1048]
-
-batch_dst_node_ids:
-[230767 231920 235070 116874]
-
-batch_node_interact_times:
-[1.68677046e+09 1.68676649e+09 1.68676839e+09 1.68677002e+09]
-

@@ -1,5 +1,14 @@
 {
-    "new node test metrics": {
-        "MRR": "0.3126"
+    "new node test metrics_1": {
+        "MRR": 0.2790180623785203,
+        "ILD@10": 0.8133327433666312
+    },
+    "new node test metrics_2": {
+        "MRR": 0.1711997671739912,
+        "ILD@10": 0.8597004981564399
+    },
+    "new node test metrics_3": {
+        "MRR": 0.284446168531641,
+        "ILD@10": 0.7658324922504238
     }
 }

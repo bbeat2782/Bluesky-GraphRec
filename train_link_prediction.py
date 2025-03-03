@@ -33,7 +33,7 @@ if __name__ == "__main__":
     args = get_link_prediction_args(is_evaluation=False)
 
     # get data for training, validation and testing
-    node_raw_features, edge_raw_features, full_data, train_data, val_data, test_data, new_node_val_data, new_node_test_data, user_dynamic_features = \
+    node_raw_features, edge_raw_features, full_data, train_data, val_data, test_data, new_node_val_data, new_node_test_data, user_dynamic_features, post_dynamic_features = \
         get_link_prediction_data(dataset_name=args.dataset_name, val_ratio=args.val_ratio, test_ratio=args.test_ratio)
 
     # Print dataset statistics
@@ -49,9 +49,6 @@ if __name__ == "__main__":
     print("\nValidation set:")
     print(f"Number of interactions: {len(val_data.src_node_ids)}")
     print(f"Number of unique nodes: {val_data.num_unique_nodes}")
-    print("\nTest set:") 
-    print(f"Number of interactions: {len(test_data.src_node_ids)}")
-    print(f"Number of unique nodes: {test_data.num_unique_nodes}")
     print("\nNew node validation set:")
     print(f"Number of interactions: {len(new_node_val_data.src_node_ids)}")
     print(f"Number of unique nodes: {new_node_val_data.num_unique_nodes}")
@@ -71,17 +68,6 @@ if __name__ == "__main__":
     # initialize validation and test neighbor sampler to retrieve temporal graph
     full_neighbor_sampler = get_neighbor_sampler(data=full_data, sample_neighbor_strategy=args.sample_neighbor_strategy,
                                                  time_scaling_factor=args.time_scaling_factor, seed=1)
-    
-    # # Write neighbor sampler data to file
-    # with open('neighbor_sampler_data.txt', 'w') as f:
-    #     f.write("\n\nFirst 5 entries of neighbor IDs:\n") 
-    #     f.write(str(train_neighbor_sampler.nodes_neighbor_ids[:5]))
-    #     f.write("\n\nFirst 5 entries of edge IDs:\n")
-    #     f.write(str(train_neighbor_sampler.nodes_edge_ids[:5]))
-    #     f.write("\n\nFirst 5 entries of neighbor timestamps:\n")
-    #     f.write(str(train_neighbor_sampler.nodes_neighbor_times[:5]))
-    #     f.write("\n\nFirst 5 entries of neighbor indices:\n")
-    #     f.write(str(train_neighbor_sampler.nodes_neighbor_idx[:5]))
 
     # initialize negative samplers, set seeds for validation and testing so negatives are the same across different runs
     train_neg_edge_sampler = MultipleNegativeEdgeSampler(src_node_ids=train_data.src_node_ids, dst_node_ids=train_data.dst_node_ids, seed=2025, negative_sample_strategy=args.negative_sample_strategy, interact_times=train_data.node_interact_times)
@@ -101,9 +87,7 @@ if __name__ == "__main__":
     val_metric_all_runs, new_node_val_metric_all_runs, test_metric_all_runs, new_node_test_metric_all_runs = [], [], [], []
 
     for run in range(args.num_runs):
-
-        # Skipping TGAT run = 0
-        if run == 0 or run == 1 or run == 2 or run == 4:
+        if run != 2:
             continue
 
         set_random_seed(seed=run)
@@ -140,15 +124,16 @@ if __name__ == "__main__":
             dynamic_backbone = GraphRecMultiCo(node_raw_features=node_raw_features, neighbor_sampler=train_neighbor_sampler,
                                          time_feat_dim=args.time_feat_dim, channel_embedding_dim=args.channel_embedding_dim, patch_size=args.patch_size,
                                          num_layers=args.num_layers, num_heads=args.num_heads, dropout=args.dropout,
-                                         max_input_sequence_length=args.max_input_sequence_length, device=args.device, user_dynamic_features=user_dynamic_features,
+                                         max_input_sequence_length=args.max_input_sequence_length, device=args.device, user_dynamic_features=user_dynamic_features, 
+                                         post_dynamic_features=post_dynamic_features,
                                          src_max_id=train_data.src_max_id, walk_length=args.walk_length, num_neighbors=args.num_neighbors)
         elif args.model_name == 'TGAT':
             dynamic_backbone = TGAT(node_raw_features=node_raw_features, edge_raw_features=edge_raw_features, neighbor_sampler=train_neighbor_sampler,
                                     time_feat_dim=args.time_feat_dim, num_layers=args.num_layers, dropout=args.dropout, device=args.device)
         else:
             raise ValueError(f"Wrong value for model_name {args.model_name}!")
-        link_predictor = MergeLayer(input_dim1=node_raw_features.shape[1], input_dim2=node_raw_features.shape[1],
-                                    hidden_dim=node_raw_features.shape[1], output_dim=1)
+        link_predictor = MergeLayer(input_dim1=node_raw_features.shape[1]+64, input_dim2=node_raw_features.shape[1]+64,
+                                    hidden_dim=node_raw_features.shape[1]+64, output_dim=1)
         model = nn.Sequential(dynamic_backbone, link_predictor)
         logger.info(f'model -> {model}')
         logger.info(f'model name: {args.model_name}, #parameters: {get_parameter_sizes(model) * 4} B, '
@@ -183,8 +168,8 @@ if __name__ == "__main__":
             # store train losses and metrics
             train_losses, train_metrics = [], []
             train_idx_data_loader_tqdm = tqdm(train_idx_data_loader, ncols=120)
-            for batch_idx, train_data_indices in enumerate(train_idx_data_loader_tqdm):
-                if batch_idx < start_batch:
+            for batch, train_data_indices in enumerate(train_idx_data_loader_tqdm):
+                if batch < start_batch:
                     continue  # Skip first 90% of batches
                 
                 train_data_indices = train_data_indices.numpy()
@@ -193,31 +178,31 @@ if __name__ == "__main__":
                     train_data.node_interact_times[train_data_indices], train_data.edge_ids[train_data_indices]
 
                 # For dynamic features
-                batch_src_idx = train_data.idx[train_data_indices]
+                batch_idx = train_data.idx[train_data_indices]
 
                 # batch_neg_dst_node_ids.shape: (batch_size, 4)
                 _, batch_neg_dst_node_ids = train_neg_edge_sampler.sample(size=len(batch_src_node_ids), current_batch_start_time=batch_node_interact_times)
 
                 # batch_neg_src_node_ids = batch_src_node_ids
                 batch_neg_src_node_ids = np.repeat(batch_src_node_ids, 4, axis=0).reshape(len(batch_src_node_ids), 4)
-                batch_neg_src_idx = np.repeat(batch_src_idx, 4, axis=0).reshape(len(batch_src_idx), 4)
+                batch_neg_idx = np.repeat(batch_idx, 4, axis=0).reshape(len(batch_idx), 4)
 
                 # Flatten negative samples to compute embeddings properly
                 batch_neg_src_node_ids_flat = batch_neg_src_node_ids.flatten()  # (batch_size * 4,)
                 batch_neg_dst_node_ids_flat = batch_neg_dst_node_ids.flatten()  # (batch_size * 4,)
                 batch_neg_times_flat = np.repeat(batch_node_interact_times, 4, axis=0).flatten()  # (batch_size * 4,)
-                batch_neg_src_idx_flat = batch_neg_src_idx.flatten()  # (batch_size * 4,)
+                batch_neg_idx_flat = batch_neg_idx.flatten()  # (batch_size * 4,)
 
                 # we need to compute for positive and negative edges respectively, because the new sampling strategy (for evaluation) allows the negative source nodes to be
                 # different from the source nodes, this is different from previous works that just replace destination nodes with negative destination nodes
-                if args.model_name in ['GraphRec', 'GraphRecMulti', 'GraphRecMultiCo']:
+                if args.model_name in ['GraphRecMultiCo']:
                     # get temporal embedding of source and destination nodes
                     # two Tensors, with shape (batch_size, node_feat_dim)
                     batch_src_node_embeddings, batch_dst_node_embeddings = \
                         model[0].compute_src_dst_node_temporal_embeddings(src_node_ids=batch_src_node_ids,
                                                                           dst_node_ids=batch_dst_node_ids,
                                                                           node_interact_times=batch_node_interact_times,
-                                                                          batch_src_idx=batch_src_idx)
+                                                                          batch_idx=batch_idx)
 
                     # get temporal embedding of negative source and negative destination nodes
                     # two Tensors, with shape (batch_size, node_feat_dim)
@@ -225,7 +210,7 @@ if __name__ == "__main__":
                         model[0].compute_src_dst_node_temporal_embeddings(src_node_ids=batch_neg_src_node_ids_flat,
                                                                           dst_node_ids=batch_neg_dst_node_ids_flat,
                                                                           node_interact_times=batch_neg_times_flat,
-                                                                          batch_src_idx=batch_neg_src_idx_flat)
+                                                                          batch_idx=batch_neg_idx_flat)
 
                     # Reshape back to (batch_size, 4, node_feat_dim) so that each positive has 4 negatives
                     node_feat_dim = batch_neg_src_node_embeddings.shape[1]  # Get feature dimension
@@ -282,7 +267,7 @@ if __name__ == "__main__":
                 bpr_loss.backward()
                 optimizer.step()    
 
-                train_idx_data_loader_tqdm.set_description(f'Epoch: {epoch + 1}, train for the {batch_idx + 1}-th batch, train loss: {bpr_loss.item()}')
+                train_idx_data_loader_tqdm.set_description(f'Epoch: {epoch + 1}, train for the {batch + 1}-th batch, train loss: {bpr_loss.item()}')
 
             val_losses, val_metrics = evaluate_model_link_prediction(model_name=args.model_name,
                                                                      model=model,
@@ -338,33 +323,6 @@ if __name__ == "__main__":
             logger.info(f'new node validate loss: {np.mean(new_node_val_losses):.4f}')
             for metric_name in new_node_val_metrics[0].keys():
                 logger.info(f'new node validate {metric_name}, {np.mean([new_node_val_metric[metric_name] for new_node_val_metric in new_node_val_metrics]):.4f}')
-
-            # # perform testing once after test_interval_epochs
-            # if (epoch + 1) % args.test_interval_epochs == 0:
-            #     test_losses, test_metrics = evaluate_model_link_prediction(model_name=args.model_name,
-            #                                                                model=model,
-            #                                                                neighbor_sampler=full_neighbor_sampler,
-            #                                                                evaluate_idx_data_loader=test_idx_data_loader,
-            #                                                                evaluate_neg_edge_sampler=test_neg_edge_sampler,
-            #                                                                evaluate_data=test_data,
-            #                                                                num_neighbors=args.num_neighbors,
-            #                                                                time_gap=args.time_gap)
-
-            #     new_node_test_losses, new_node_test_metrics = evaluate_model_link_prediction(model_name=args.model_name,
-            #                                                                                  model=model,
-            #                                                                                  neighbor_sampler=full_neighbor_sampler,
-            #                                                                                  evaluate_idx_data_loader=new_node_test_idx_data_loader,
-            #                                                                                  evaluate_neg_edge_sampler=new_node_test_neg_edge_sampler,
-            #                                                                                  evaluate_data=new_node_test_data,
-            #                                                                                  num_neighbors=args.num_neighbors,
-            #                                                                                  time_gap=args.time_gap)
-
-            #     logger.info(f'test loss: {np.mean(test_losses):.4f}')
-            #     for metric_name in test_metrics[0].keys():
-            #         logger.info(f'test {metric_name}, {np.mean([test_metric[metric_name] for test_metric in test_metrics]):.4f}')
-            #     logger.info(f'new node test loss: {np.mean(new_node_test_losses):.4f}')
-            #     for metric_name in new_node_test_metrics[0].keys():
-            #         logger.info(f'new node test {metric_name}, {np.mean([new_node_test_metric[metric_name] for new_node_test_metric in new_node_test_metrics]):.4f}')
 
             # select the best model based on all the validate metrics
             val_metric_indicator = []

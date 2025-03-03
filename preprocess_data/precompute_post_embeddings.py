@@ -101,9 +101,9 @@ df['embedding_date'] = df['timestamp'].dt.date
 # Prepare data for processing
 logger.info("Preparing data...")
 df = df.sort_values(['i', 'timestamp'])  # Sort by post and time
+grouped_posts = df.groupby('i')
 # df = df[(df['timestamp'] >= '2023-03-15') & (df['timestamp'] <= '2023-03-22')]  # Filter by time range
-df = df[(df['timestamp'] >= '2023-06-01')]
-grouped_posts = df.groupby('i')  # Group by post ID (already mapped)
+# df = df[(df['timestamp'] >= '2023-06-01')]
 
 # Initialize list to store embedding results
 all_embeddings = []
@@ -150,7 +150,7 @@ for post_id, post_interactions in tqdm(grouped_posts):
                     embedding_source = "consumer"
                 else:
                     # If no embedding found, use zeros
-                    initial_embedding = np.zeros(embedding_dim, dtype=np.float32)
+                    initial_embedding = np.zeros(embedding_dim, dtype=np.float16)
                     embedding_source = "zero"
                 
                 # Initialize running sum with initial embedding
@@ -163,21 +163,21 @@ for post_id, post_interactions in tqdm(grouped_posts):
                         'post_id': int(post_id),
                         'user_id': creator_id,
                         'timestamp': created_at,
-                        'embedding': initial_embedding.astype(np.float32),
+                        'embedding': initial_embedding.astype(np.float16),
                         'num_interactions': 0,  # 0 interactions
                         'embedding_source': embedding_source
                     })
                     initial_embeddings_count += 1
         else:
             missing_creator_count += 1
-        
+
         # Initialize running sum if not already done
         if running_sum is None:
-            running_sum = np.zeros(embedding_dim, dtype=np.float32)
-        
+            running_sum = np.zeros(embedding_dim, dtype=np.float16)
+
         # Process each interaction in chronological order
         for i, row in post_interactions.iterrows():
-            try:
+            try:                
                 user_id = int(row['u'])  # User ID from processed data
                 interaction_date = row['embedding_date']
                 
@@ -188,7 +188,13 @@ for post_id, post_interactions in tqdm(grouped_posts):
                     if user_id in user_dynamic_features[date_timestamp]:
                         # Get user embedding for this interaction
                         user_embedding = user_dynamic_features[date_timestamp][user_id]
-                        
+
+                        if count != 0:
+                            prev_value = running_sum / count
+                        else:
+                            # Optionally, define a default value if count is 0.
+                            prev_value = running_sum
+
                         # Update running sum and count
                         running_sum += user_embedding
                         count += 1
@@ -200,7 +206,8 @@ for post_id, post_interactions in tqdm(grouped_posts):
                             'post_id': int(post_id),
                             'user_id': user_id,
                             'timestamp': row['timestamp'],
-                            'embedding': avg_embedding.astype(np.float32),
+                            'prev_embedding': prev_value.astype(np.float16),
+                            'embedding': avg_embedding.astype(np.float16),
                             'num_interactions': count - (1 if initial_embedding is not None else 0),  # Count interactions only
                             'embedding_source': 'avg'  # This is now an average
                         })
@@ -226,6 +233,11 @@ post_embeddings_df = pd.DataFrame(all_embeddings)
 post_embeddings_df = post_embeddings_df.sort_values('timestamp')
 output_file = os.path.join(os.path.expanduser("~"), 'post_dynamic_embeddings.parquet')
 post_embeddings_df.to_parquet(output_file, compression='snappy')
+
+# print(post_embeddings_df['post_id'].min())
+# print(post_embeddings_df['post_id'].max())
+# print(post_embeddings_df['user_id'].min())
+# print(post_embeddings_df['user_id'].max())
 
 # Verify embeddings
 logger.info("Loading embeddings to verify...")
