@@ -32,16 +32,16 @@ cd preprocess_data/
 python extract_from_duckdb.py
 ```
 
-For creating user features using SVD on a consumer-producer graph.
-```{bash}
-python preprocess_user_features.py
-```
-
 We can run ```preprocess_data/preprocess_data.py``` for pre-processing the datasets.
 To preprocess the *Bluesky* dataset, we can run the following commands:
 ```{bash}
-cd preprocess_data/
 python preprocess_data.py  --dataset_name bluesky
+```
+
+For creating user and post features using SVD on a consumer-producer graph.
+```{bash}
+python preprocess_user_features.py
+python precompute_post_embeddings.py
 ```
 
 ## Evaluation Tasks
