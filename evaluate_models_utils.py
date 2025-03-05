@@ -66,7 +66,7 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                 batch_dst_node_ids, 
                 batch_node_interact_times
             )
-            start_time = time.time()
+            inference_start_time = time.time()
             if popularity_based:
                 model_name = 'Popularity'
                 load_model_name = 'Popularity'
@@ -181,9 +181,9 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                     sorted_candidates = post_candidates[sorted_indices]
     
                     recommended_posts.append(sorted_candidates.tolist()) 
-            end_time = time.time()
+            inference_end_time = time.time()
             count += 1
-            iter_time = end_time - start_time
+            iter_time = inference_end_time - inference_start_time
             # Update running average
             running_avg += (iter_time - running_avg) / count
         
