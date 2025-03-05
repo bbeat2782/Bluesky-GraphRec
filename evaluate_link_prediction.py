@@ -10,8 +10,6 @@ import pickle
 import pandas as pd
 
 from models.TGAT import TGAT
-from models.GraphRec import GraphRec
-from models.GraphRecMulti import GraphRecMulti
 from models.GraphRecMultiCo import GraphRecMultiCo
 from models.modules import MergeLayer
 from utils.utils import set_random_seed, convert_to_gpu, get_parameter_sizes
@@ -52,6 +50,8 @@ if __name__ == "__main__":
 
         post_embeddings_path = os.path.join(os.path.expanduser("~"), 'post_dynamic_embeddings.parquet')
         post_embeddings_df = pd.read_parquet(post_embeddings_path)
+        if 'prev_embedding' in post_embeddings_df.columns:
+            post_embeddings_df = post_embeddings_df.drop(columns=['prev_embedding'])
         
         # Initialize with embedding-based candidate sampler instead of heuristic sampler
         new_node_test_neg_edge_sampler = EmbeddingCandidateEdgeSampler(
@@ -69,7 +69,6 @@ if __name__ == "__main__":
     result_json = {}
 
     for run in range(args.num_runs):
-
         set_random_seed(seed=run)
 
         # args.seed = run
@@ -107,13 +106,16 @@ if __name__ == "__main__":
                                             max_input_sequence_length=args.max_input_sequence_length, device=args.device, user_dynamic_features=dynamic_user_features,
                                             post_dynamic_features=post_dynamic_features,
                                             src_max_id=eval_test_data.src_max_id, walk_length=args.walk_length, num_neighbors=args.num_neighbors)
+
+            link_predictor = MergeLayer(input_dim1=node_raw_features.shape[1]+64, input_dim2=node_raw_features.shape[1]+64,
+                                    hidden_dim=node_raw_features.shape[1]+64, output_dim=1)
         elif args.model_name == 'TGAT':
             dynamic_backbone = TGAT(node_raw_features=node_raw_features, edge_raw_features=edge_raw_features, neighbor_sampler=full_neighbor_sampler,
                                     time_feat_dim=args.time_feat_dim, num_layers=args.num_layers, dropout=args.dropout, device=args.device)
+            link_predictor = MergeLayer(input_dim1=node_raw_features.shape[1], input_dim2=node_raw_features.shape[1],
+                                    hidden_dim=node_raw_features.shape[1], output_dim=1)
         else:
             raise ValueError(f"Wrong value for model_name {args.model_name}!")
-        link_predictor = MergeLayer(input_dim1=node_raw_features.shape[1]+64, input_dim2=node_raw_features.shape[1]+64,
-                                    hidden_dim=node_raw_features.shape[1]+64, output_dim=1)
         model = nn.Sequential(dynamic_backbone, link_predictor)
         logger.info(f'model -> {model}')
         logger.info(f'model name: {args.model_name}, #parameters: {get_parameter_sizes(model) * 4} B, '
@@ -139,7 +141,11 @@ if __name__ == "__main__":
                                         evaluate_data=eval_test_data,
                                         num_neighbors=args.num_neighbors,
                                         time_gap=args.time_gap,
-                                        load_model_name=args.load_model_name)
+                                        load_model_name=args.load_model_name,
+                                        src_node_ids=full_data.src_node_ids,
+                                        dst_node_ids=full_data.dst_node_ids,
+                                        interact_times=full_data.node_interact_times
+                                        )
 
         logger.info(f'Test MRR, {avg_mrr:.4f}')
         logger.info(f'Test ILD@10, {avg_ild:.4f}')

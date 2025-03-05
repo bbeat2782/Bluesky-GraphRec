@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Load JSON data
-graphrec_path = 'GraphRecMultiCo/bluesky/training_results_42_1.json'  # Renamed for clarity
+graphrec_path = 'GraphRecMultiCo/bluesky/training_results_100_1.json'  # Renamed for clarity
 mlp_path = 'TGAT/bluesky/training_results_42_1.json'
 
 with open(graphrec_path, 'r') as f:
@@ -66,8 +66,8 @@ for i, (metric_key, metric_label) in enumerate(metrics.items()):
     plt.ylabel(metric_label)
     plt.title(f"Comparison of {metric_label} for GraphRec and MLP-Based Models")
 
-    #if i == 0:  # Only include legend in the first plot
-    plt.legend()
+    if i == 0:  # Only include legend in the first plot
+        plt.legend()
 
     plt.grid(True)
     plt.savefig(plot_filenames[metric_key])  # Save figure

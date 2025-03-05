@@ -155,3 +155,6 @@ lightgcn
 **/recommended_posts.json
 
 *.pkl
+
+saved_results/*/*/*_recommended_posts.json
+!saved_models/**/*/*.pkl

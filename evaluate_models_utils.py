@@ -19,7 +19,8 @@ from utils.DataLoader import Data
 
 def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborSampler, evaluate_idx_data_loader: DataLoader,
                                    evaluate_neg_edge_sampler, evaluate_data: Data,
-                                   num_neighbors: int = 20, time_gap=8, load_model_name=None):
+                                   num_neighbors: int = 20, time_gap=8, load_model_name=None,
+                                   src_node_ids=None, dst_node_ids=None, interact_times=None):
     """
     evaluate models on the link prediction task
     :param model_name: str, name of the model
@@ -41,7 +42,14 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
     with torch.no_grad():
         # store evaluate losses and metrics
         mrr_results = []
-        evaluate_idx_data_loader_tqdm = tqdm(evaluate_idx_data_loader, ncols=120)
+        #evaluate_idx_data_loader_tqdm = tqdm(evaluate_idx_data_loader, ncols=120)
+        evaluate_idx_data_loader_tqdm = tqdm(
+            evaluate_idx_data_loader, 
+            ncols=120, 
+            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}, {postfix}]"
+        )
+        running_avg = 0.0
+        count = 0
         for batch_idx, evaluate_data_indices in enumerate(evaluate_idx_data_loader_tqdm):
             evaluate_data_indices = evaluate_data_indices.numpy()
             batch_src_node_ids, batch_dst_node_ids, batch_node_interact_times, batch_edge_ids = \
@@ -51,37 +59,43 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
             batch_src_idx = evaluate_data.idx[evaluate_data_indices]
             
             popularity_based = False  # TODO make this as an argument
+
+            candidates_dict = evaluate_neg_edge_sampler.sample(
+                len(batch_src_node_ids), 
+                batch_src_node_ids, 
+                batch_dst_node_ids, 
+                batch_node_interact_times
+            )
+            start_time = time.time()
             if popularity_based:
                 model_name = 'Popularity'
-                candidates_dict = evaluate_neg_edge_sampler.sample(
-                    len(batch_src_node_ids), 
-                    batch_src_node_ids, 
-                    batch_dst_node_ids, 
-                    batch_node_interact_times,
-                    popularity_based=popularity_based
-                )
+                load_model_name = 'Popularity'
+                for src_node_id, dst_node_id, node_interact_time in zip(batch_src_node_ids, batch_dst_node_ids, batch_node_interact_times):
+                    #start_time = node_interact_time - 60*60*24  # 24hrs
+                    #selected_time_interval = np.logical_and(interact_times > start_time, interact_times <= node_interact_time)
+                    selected_time_interval = interact_times <= node_interact_time
+                    dst_node_ids_interval = dst_node_ids[selected_time_interval]
 
-                for true_dst_id, interact_time in zip(batch_dst_node_ids, batch_node_interact_times):
-                    candidates = candidates_dict[interact_time]
+                    candidates = set(candidates_dict[node_interact_time])
+                    candidate_mask = np.in1d(dst_node_ids_interval, list(candidates))
+                    filtered_dst_node_ids = dst_node_ids_interval[candidate_mask]
 
-                    # Find the rank of the true destination ID
-                    if true_dst_id in candidates:
-                        rank = np.where(candidates == true_dst_id)[0][0] + 1
-                        reciprocal_rank = 1.0 / rank
+                    unique_dst_node_ids, counts = np.unique(filtered_dst_node_ids, return_counts=True)
+
+                    sort_indices = np.argsort(counts)[::-1]
+                    sorted_ids = unique_dst_node_ids[sort_indices]
+
+
+                    indices = np.where(sorted_ids == dst_node_id)[0]
+                    if len(indices) > 0:
+                        rank = indices[0] + 1
+                        mrr_results.append(1.0 / rank)
                     else:
-                        reciprocal_rank = 0.0  # True ID not in candidates
-        
-                    mrr_results.append(reciprocal_rank)
-                    recommended_posts.append(candidates.tolist())
+                        mrr_results.append(0.0)
+                
+                    recommended_posts.append(sorted_ids.tolist())
             else:
-
-                candidates_dict = evaluate_neg_edge_sampler.sample(
-                    len(batch_src_node_ids), 
-                    batch_src_node_ids, 
-                    batch_dst_node_ids, 
-                    batch_node_interact_times
-                )
-    
+                # can remove this part
                 # Iterate through candidates_dict to calculate lengths
                 for start_time, candidates in candidates_dict.items():
                     # Store in candidates_length (accumulate counts if start_time repeats across batches)
@@ -111,7 +125,7 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                 batch_interact_times = np.concatenate(batch_interact_times)
                 batch_src_ids = np.concatenate(batch_src_ids)
                 batch_idx = np.concatenate(batch_idx)
-
+    
                 if model_name == 'GraphRecMultiCo':
                     # Compute embeddings in one operation
                     src_embeddings, dst_embeddings = model[0].compute_src_dst_node_temporal_embeddings(
@@ -144,7 +158,7 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                     # Convert to numpy for indexing
                     post_probabilities = np.array(post_probabilities)
                     post_candidates = np.array(post_candidates)
-
+    
                     # Find the index of the true destination ID
                     true_dst_index = np.where(post_candidates == true_dst_id)[0]
                     
@@ -158,15 +172,24 @@ def evaluate_real(model_name: str, model: nn.Module, neighbor_sampler: NeighborS
                     else:
                         # True destination not found in candidates
                         mrr_results.append(0)
-
+    
                     # NOTE: For checking which posts are recommended. Comment this when you do not need it
                     # Sort indices based on probabilities in descending order
                     sorted_indices = np.argsort(-post_probabilities)  # Negative sign for descending order
                 
                     # Apply sorted indices to both arrays
                     sorted_candidates = post_candidates[sorted_indices]
-
+    
                     recommended_posts.append(sorted_candidates.tolist()) 
+            end_time = time.time()
+            count += 1
+            iter_time = end_time - start_time
+            # Update running average
+            running_avg += (iter_time - running_avg) / count
+        
+            # Update the progress bar with the current running average time per iteration
+            evaluate_idx_data_loader_tqdm.set_postfix(avg_iter_time=f"{running_avg:.4f} sec")
+            evaluate_idx_data_loader_tqdm.refresh()
 
     # NOTE: For checking which posts are recommended
     # Create directory if it doesn't exist

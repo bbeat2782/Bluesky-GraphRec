@@ -86,7 +86,7 @@ class EmbeddingCandidateEdgeSampler:
             Dictionary mapping interaction times to candidate post IDs
         """
         candidates_dict = {}
-        debug_info = []  # For debugging
+        debug_info = []  # For debugging            
         
         # Process each interaction
         for i in range(size):
@@ -245,31 +245,31 @@ class EmbeddingCandidateEdgeSampler:
         # Save debug info for analysis
         self.debug_info = debug_info
         
-        # Print debug statistics
-        if self.total_processed % 100 == 0:
-            print(f"Debug stats: Total processed: {self.total_processed}")
-            print(f"True post added count: {self.true_post_added_count} ({self.true_post_added_count/self.total_processed*100:.2f}%)")
+        # # Print debug statistics
+        # if self.total_processed % 100 == 0:
+        #     print(f"Debug stats: Total processed: {self.total_processed}")
+        #     print(f"True post added count: {self.true_post_added_count} ({self.true_post_added_count/self.total_processed*100:.2f}%)")
             
-            # Print hit rate statistics
-            print("Hit Rate@k:")
-            for k in self.k_values:
-                hit_rate = (self.hit_counters[k] / self.total_processed) * 100
-                print(f"  Hit@{k}: {hit_rate:.2f}%")
+        #     # Print hit rate statistics
+        #     print("Hit Rate@k:")
+        #     for k in self.k_values:
+        #         hit_rate = (self.hit_counters[k] / self.total_processed) * 100
+        #         print(f"  Hit@{k}: {hit_rate:.2f}%")
             
-            # Print detailed fallback statistics
-            total_fallbacks = sum(self.fallback_counters.values())
-            print(f"Total fallbacks: {total_fallbacks} ({total_fallbacks/self.total_processed*100:.2f}%)")
-            print("Fallback reasons breakdown:")
-            for reason, count in self.fallback_counters.items():
-                if count > 0:
-                    print(f"  - {reason}: {count} ({count/total_fallbacks*100:.2f}% of fallbacks)")
+        #     # Print detailed fallback statistics
+        #     total_fallbacks = sum(self.fallback_counters.values())
+        #     print(f"Total fallbacks: {total_fallbacks} ({total_fallbacks/self.total_processed*100:.2f}%)")
+        #     print("Fallback reasons breakdown:")
+        #     for reason, count in self.fallback_counters.items():
+        #         if count > 0:
+        #             print(f"  - {reason}: {count} ({count/total_fallbacks*100:.2f}% of fallbacks)")
             
-            # Analyze why true posts aren't in candidates
-            if len(debug_info) > 0:
-                not_in_candidates = [info for info in debug_info if info.get("true_post_in_candidates") is False]
-                if not_in_candidates:
-                    print(f"Sample reasons true post not in candidates:")
-                    for i, info in enumerate(not_in_candidates[:3]):
-                        print(f"  Example {i+1}: {info.get('error', 'No error')}, Active posts: {info.get('num_active_posts', 'N/A')}")
+        #     # Analyze why true posts aren't in candidates
+        #     if len(debug_info) > 0:
+        #         not_in_candidates = [info for info in debug_info if info.get("true_post_in_candidates") is False]
+        #         if not_in_candidates:
+        #             print(f"Sample reasons true post not in candidates:")
+        #             for i, info in enumerate(not_in_candidates[:3]):
+        #                 print(f"  Example {i+1}: {info.get('error', 'No error')}, Active posts: {info.get('num_active_posts', 'N/A')}")
         
         return candidates_dict

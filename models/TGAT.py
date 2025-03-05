@@ -81,7 +81,7 @@ class TGAT(nn.Module):
                                                                        num_neighbors=num_neighbors)
 
             # Sample neighbors
-            neighbor_node_ids, neighbor_edge_ids, neighbor_times = self.neighbor_sampler.get_historical_neighbors(
+            neighbor_node_ids, neighbor_edge_ids, neighbor_times, _ = self.neighbor_sampler.get_historical_neighbors(
                 node_ids=node_ids,
                 node_interact_times=node_interact_times,
                 num_neighbors=num_neighbors

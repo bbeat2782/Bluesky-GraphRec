@@ -87,9 +87,6 @@ if __name__ == "__main__":
     val_metric_all_runs, new_node_val_metric_all_runs, test_metric_all_runs, new_node_test_metric_all_runs = [], [], [], []
 
     for run in range(args.num_runs):
-        if run != 2:
-            continue
-
         set_random_seed(seed=run)
 
         # args.seed = run
@@ -127,13 +124,16 @@ if __name__ == "__main__":
                                          max_input_sequence_length=args.max_input_sequence_length, device=args.device, user_dynamic_features=user_dynamic_features, 
                                          post_dynamic_features=post_dynamic_features,
                                          src_max_id=train_data.src_max_id, walk_length=args.walk_length, num_neighbors=args.num_neighbors)
+            link_predictor = MergeLayer(input_dim1=node_raw_features.shape[1]+64, input_dim2=node_raw_features.shape[1]+64,
+                                    hidden_dim=node_raw_features.shape[1]+64, output_dim=1)
         elif args.model_name == 'TGAT':
             dynamic_backbone = TGAT(node_raw_features=node_raw_features, edge_raw_features=edge_raw_features, neighbor_sampler=train_neighbor_sampler,
                                     time_feat_dim=args.time_feat_dim, num_layers=args.num_layers, dropout=args.dropout, device=args.device)
+
+            link_predictor = MergeLayer(input_dim1=node_raw_features.shape[1], input_dim2=node_raw_features.shape[1],
+                                    hidden_dim=node_raw_features.shape[1], output_dim=1)
         else:
             raise ValueError(f"Wrong value for model_name {args.model_name}!")
-        link_predictor = MergeLayer(input_dim1=node_raw_features.shape[1]+64, input_dim2=node_raw_features.shape[1]+64,
-                                    hidden_dim=node_raw_features.shape[1]+64, output_dim=1)
         model = nn.Sequential(dynamic_backbone, link_predictor)
         logger.info(f'model -> {model}')
         logger.info(f'model name: {args.model_name}, #parameters: {get_parameter_sizes(model) * 4} B, '
@@ -329,15 +329,6 @@ if __name__ == "__main__":
             for metric_name in val_metrics[0].keys():
                 val_metric_indicator.append((metric_name, np.mean([val_metric[metric_name] for val_metric in val_metrics]), True))
             early_stop = early_stopping.step(val_metric_indicator, model)
-
-            # # Compute the mean validation loss
-            # val_loss = np.mean(val_losses)
-            
-            # # Use validation loss as the stopping criterion (lower is better)
-            # val_metric_indicator = [("val_loss", val_loss, False)]  # Lower is better
-            
-            # # Execute early stopping based on loss
-            # early_stop = early_stopping.step(val_metric_indicator, model)
 
             if early_stop:
                 break
