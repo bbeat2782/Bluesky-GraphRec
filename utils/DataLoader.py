@@ -280,7 +280,7 @@ def get_link_prediction_data_eval(dataset_name: str, val_ratio: float, test_rati
     filtered_idx = idx[val_mask]
 
     
-    length_restrict = int(0.1 * len(filtered_src_node_ids))
+    length_restrict = int(0.01 * len(filtered_src_node_ids))
 
     interactions_df = pd.DataFrame({
         'src_node_id': filtered_src_node_ids[:length_restrict],

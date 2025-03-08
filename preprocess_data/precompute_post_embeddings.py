@@ -103,7 +103,7 @@ logger.info("Preparing data...")
 df = df.sort_values(['i', 'timestamp'])  # Sort by post and time
 grouped_posts = df.groupby('i')
 # df = df[(df['timestamp'] >= '2023-03-15') & (df['timestamp'] <= '2023-03-22')]  # Filter by time range
-# # df = df[(df['timestamp'] >= '2023-06-01')]
+df = df[(df['timestamp'] >= '2023-06-01')]
 
 # Initialize list to store embedding results
 all_embeddings = []
