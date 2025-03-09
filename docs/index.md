@@ -10,24 +10,35 @@ title: Evaluating Graph Transformers for Scalable Social Media Recommendations
 
 ## Introduction
 
+[Bluesky](https://bsky.app/) is a decentralized social media platform similar to Twitter, where the data on the network is open for access to everyone. 
+
 ### What is the problem?
 
-[Bluesky](https://bsky.app/) represents a new decentralized social media platform that operates on the AT Protocol, allowing open and transparent access to social media data. Unlike traditional platforms such as Twitter or Facebook, where recommendation algorithms are proprietary and opaque, Bluesky provides developers with the opportunity to create custom recommendation systems. However, designing a scalable and personalized recommendation model for an open network presents several challenges.
+Recommendation systems in social media platforms face unique challenges compared to traditional recommendation domains like movies or music. Unlike static user-item interactions, social media engagement is highly dynamic—users interact with new posts, trends emerge, and user preferences shift rapidly. Traditional recommendation techniques, such as collaborative filtering and matrix factorization, require periodic recomputation over the entire dataset, making them computationally expensive and difficult to scale for real-time recommendations.
 
-Traditional recommendation methods based on popularity ranking and static heuristics suffer from the following issues:
-<!-- Need to rephrase this part -->
-- Lack of personalization, where users receive generic content rather than posts tailored to their interests.
-- Temporal bias, where older posts continue to be recommended due to accumulated engagement, limiting exposure to new content.
-- Computational inefficiency, since real-time recommendation for millions of users interacting with billions of posts requires significant optimization.
+Additionally, decentralized platforms like Bluesky introduce further complexities:
+- **Lack of centralized control**: Unlike traditional social media platforms, where a single entity maintains and processes all user data, Bluesky operates on an open and federated network.
+- **Scalability constraints**: Real-time recommendation updates must efficiently handle large, evolving graphs without centralized computation.
+- **User privacy concerns**: Decentralized social networks require recommendation models that can function without relying on a single authority managing user data.
+
+Given these challenges, a scalable and decentralized recommendation system must adapt in real-time while maintaining computational efficiency.
+
 
 ### Why is this important?
 
-With the rise of decentralized social media, traditional recommendation algorithms need to be re-evaluated for scalability and efficiency in an open setting. Our project explores how graph-based methods, particularly Graph Transformers, can be used to build scalable and personalized recommendation systems for Bluesky.
+Developing scalable recommendation models for social media platforms like Bluesky is crucial for several reasons:
 
-By leveraging graph structures and temporal learning, we aim to:
-- Reduce redundancy in recommended content, ensuring diverse posts appear in user feeds.
-- Capture user interaction dynamics, adapting recommendations to real-time engagement.
-- Develop a scalable ranking system that remains computationally feasible for large-scale data.
+- **Maintaining Engagement**: Users expect recommendations that reflect their evolving interests. A system that fails to adapt to dynamic user interactions risks decreased engagement and retention.
+- **Computational Efficiency**: Traditional methods like matrix factorization require expensive periodic recomputation. Scalable models enable real-time updates, reducing computational overhead.
+- **Real-Time Adaptability**: Social media trends shift quickly. A recommendation system should be able to incorporate new interactions without retraining the entire model.
+- **Personalization at Scale**: Providing personalized recommendations across a growing user base requires efficient methods that can handle increasing data volume without significant delays.
+
+<figure style="text-align: center;">
+   <img src="assets/objective.pdf" width="60%" />
+   <!-- <figcaption>Jina Embeddings encode the semantic structure of text data.</figcaption> -->
+</figure>
+
+By addressing these challenges, we aim to design a scalabel recommendation system that captures user interests in real time while balancing personalization measured by Mean Reciprocal Rate & Hit@10 and content diversity measured by Intra List Diversity. 
 
 ---
 
@@ -43,16 +54,16 @@ Bluesky provides an open API that streams real-time data across the network. The
    <img src="assets/graph.svg" width="30%" />
 </p>
 
-We collect the interaction data from the Bluesky network using an open-source library that efficiently pulls interactions and stores them in a structured database. Since the data is continuously growing, we limit our experiments to a 2023 ~ 2023 (need to check the exact time later) subset, covering an about 1.2 millions of like interactions.
+We collect 6 months of Bluesky data from the beginning of the network and construct a consumer-producer bipartite follow graph. For training, we restrict like interactions to the period from 2023-06-07 to 2023-06-14. Users with ≥ 30 followers are defined as producers.
 
 ### Dataset Summary
 
 | **Metric**       | **Count**  |
 |------------------|-----------|
-| Number of Users  | X,XXX     |
-| Number of Posts  | X,XXX     |
-| Number of Likes  | 1,200,000 |
-| Number of Followings | X,XXX |
+| Number of Users  | 23,765     |
+| Number of Posts  | 365,314     |
+| Number of Likes  | 1,042,739 |
+| Number of Followings | 7,301,917 |
 
 ---
 
@@ -230,17 +241,7 @@ This ranking score represents the likelihood of a user interacting with a post, 
 
 ## Evaluation Metrics
 
-A robust evaluation framework is crucial to assess the effectiveness of the recommendation model. In this study, we employ three key metrics: Hit Rate@K, Mean Reciprocal Rank (MRR), and Intra-List Diversity (ILD). Each of these metrics evaluates different aspects of the recommendation quality, including accuracy, ranking effectiveness, and content diversity.
-
-### Hit Rate@K
-
-Hit Rate measures how often the correct post appears within the top-K recommendations. This metric is particularly useful in candidate generation and assessing whether relevant posts are surfaced to the user.
-
-$$
-\text{HR}@K = \frac{1}{N} \sum_{i=1}^{N} \mathbb{1}(\text{target} \in \text{top-}K)
-$$
-
-where $$ \mathbb{1}(\cdot) $$ is an indicator function that returns 1 if the target post is within the top-K recommendations, otherwise 0. A higher Hit Rate@K indicates better performance, as it means that the relevant posts are consistently appearing in the top recommended results.
+A robust evaluation framework is crucial to assess the effectiveness of the recommendation model. In this study, we employ three key metrics: Mean Reciprocal Rank (MRR), Hit Rate@K, and Intra-List Diversity (ILD). Each of these metrics evaluates different aspects of the recommendation quality, including accuracy, ranking effectiveness, and content diversity.
 
 ### Mean Reciprocal Rank (MRR)
 
@@ -251,6 +252,16 @@ $$
 $$
 
 where $$ \text{rank}_i $$ is the position of the target post in the recommended list. A higher MRR is desirable as it signifies that relevant posts are placed closer to the top of the ranked list, improving user engagement.
+
+### Hit Rate@K
+
+Hit Rate measures how often the correct post appears within the top-K recommendations. This metric is particularly useful in candidate generation and assessing whether relevant posts are surfaced to the user.
+
+$$
+\text{Hit}@K = \frac{1}{N} \sum_{i=1}^{N} \mathbb{1}(\text{target} \in \text{top-}K)
+$$
+
+where $$ \mathbb{1}(\cdot) $$ is an indicator function that returns 1 if the target post is within the top-K recommendations, otherwise 0. A higher Hit Rate@K indicates better performance, as it means that the relevant posts are consistently appearing in the top recommended results.
 
 ### Intra-List Diversity (ILD)
 
@@ -264,23 +275,82 @@ where $$ \text{sim}(i, j) $$ represents the similarity between posts $$ i $$ and
 
 ---
 
+## Comparison Models
+
+### Popularity-Based Recommendation
+
+The popularity-based approach recommends Bluesky posts purely based on the number of likes a post has received. The assumption is that highly liked posts are more engaging and relevant to users, as users are influenced by social proof and tend to engage with posts that others have already liked. While this method is simple and computationally efficient, it has several limitations:
+
+- **Lack of Personalization**: All users receive similar recommendations, disregarding individual preferences.
+- **Cold Start Problem**: New posts with few or no likes struggle to gain visibility.
+- **Temporal Bias**: Older posts with accumulated likes are favored over newer content, leading to potential stagnation in recommendations.
+
+### MLP-Based Neighborhood Aggregation
+
+Unlike the popularity-based approach, which solely relies on the number of likes, the MLP-based neighborhood aggregation method learns user preferences by leveraging temporal information and interactions. This method utilizes Multi-Layer Perceptrons (MLPs) to aggregate features from a user's local network, dynamically adapting to changing behaviors over time.
+
+The architecture follows a temporal graph representation, where each node (representing a user or post) updates its embedding based on historical interactions. Instead of relying on multi-head attention mechanisms, this approach aggregates neighborhood information using mean pooling and MLP layers.
+
+This approach is expected to improve upon the limitations of popularity-based methods by incorporating:
+- **Temporal Dependencies**: Capturing how interactions evolve over time.
+- **User-Specific Behavior**: Personalizing recommendations based on individual preferences.
+- **Relational Information**: Leveraging a user's connections to enhance recommendation relevance.
+
+The backbone of this model is based on [TGAT](https://arxiv.org/abs/2002.07962), where the multi-head attention mechanism has been replaced with an MLP to establish a baseline.
+
+---
+
 ## Results
 
 The performance of different recommendation models is compared using the above evaluation metrics. The table below presents the results for the Popularity-Based, MLP-Based, and GraphRec models.
 
-NOTE: values are just placeholders
-
-| Model       | MRR ↑  | Avg Rank ↓ | ILD ↑  | Training Time (1 epoch) ↓ | Inference Time (s/user) ↓ |
+| Model       | MRR ↑  | Hit@10 ↑ | ILD ↑  | Training Time (1 epoch) ↓ | Inference Time (s/user) ↓ |
 |------------|------|----------|------|----------------------|--------------------------|
-| Popularity | 0.32 | 24.7     | 0.45 | 0.05 sec             | 0.02 sec                 |
-| MLP-Based  | 0.47 | 12.5     | 0.52 | 3.1 sec              | 0.19 sec                 |
-| GraphRec   | 0.61 | 6.3      | 0.67 | 5.8 sec              | 0.34 sec                 |
+| Popularity | 0.0345 | 0.06     | **0.6243** | NA             | **0.118 sec**                 |
+| MLP-Based  | 0.02 ± 0.001 | 0.03 ± 0.01     | 0.411 ± 0.008 | 10:48              | 0.215 sec                 |
+| GraphRec   | **0.228 ± 0.005** | **0.235 ± 0.01**     | 0.55 ± 0.02 | 18:41              | 0.283 sec                 |
 
-The results show that GraphRec achieves the highest Mean Reciprocal Rank (MRR), indicating that relevant posts are ranked higher in the recommendation list compared to other models. This suggests that GraphRec is highly effective at capturing user preferences and ranking relevant content at the top.
+### Key Findings
 
-Additionally, GraphRec achieves the highest ILD score, meaning it provides a more diverse set of recommendations. This is particularly beneficial in a decentralized social media environment like Bluesky, where exposing users to a wider range of content prevents algorithmic echo chambers and encourages content exploration.
+- **Popularity-Based Model**:
+  - Best ILD@10 score and fastest inference time, generating diverse recommendations efficiently.
+    - High diversity arises because popular posts cover a wide range of topics across all users.
+  - Weak ranking performance. Hit@10 of 0.06 signifies that only 6% of users receive the relevant recommendation in the top 10, showing poor personalization.
 
-However, there is a trade-off in computational efficiency. GraphRec has the highest training time per epoch and the slowest inference time per user. The increased computational cost is due to the complexity of the transformer-based ranking model, which requires processing graph structures and temporal embeddings. Despite this, the improved ranking accuracy and diversity justify the computational cost for platforms where recommendation quality is a priority.
+- **MLP-Based Model**:
+  - Performs worse than the Popularity-Based model in all key metrics (MRR, Hit@10, ILD@10).
+  - Higher training (10:48 per epoch) and inference time (0.215 sec/user), making it computationally expensive without notable performance benefits.
+
+- **GraphRec**:
+  - Highest MRR (0.228) and Hit@10 (0.235), excelling in ranking relevant items effectively.
+  - ILD@10 (0.55) suggests a good balance between personalization and diversity.
+  - Longer training and inference times but offers a strong trade-off between ranking accuracy and diversity.
+
+These results highlight the trade-offs between ranking accuracy, diversity, and computational efficiency when selecting a recommendation model.
+
+---
+
+## Discussion
+
+### How Do Different Models Rank Popular Posts?
+
+![Mean Rank vs. Popularity Across Different Models](assets/rank_vs_popularity_subplots.png)
+
+- **Popularity-Based Model**:
+  - Ranks highly liked posts at the top.
+  - Limits visibility for niche content, favoring already popular posts.
+
+- **MLP-Based Model**:
+  - Partially mitigates the popularity bias.
+  - The favoring trend begins to plateau once a post accumulates approximately 20 to 30 likes.
+
+- **GraphRec**:
+  - Does not inherently prioritize popular posts.
+  - Surfaces both niche and well-liked posts when aligned with user interests.
+
+- **Key Takeaways**:
+  - Transformer-based architectures help mitigate bias toward popular content.
+  - A balanced model should optimize ranking accuracy, diversity, and computational efficiency.
 
 ---
 
