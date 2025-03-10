@@ -79,17 +79,31 @@ Candidate generation is the first step in the recommendation pipeline, responsib
 
 ### Updating the Consumer-Producer Graph
 
-Since interactions happen in real-time, we maintain dynamic user embeddings:
+We maintain dynamic user embeddings using two strategies:
 
-TODO How is it being updated?
+1. **Periodic Batch Updates (Consumer Embeddings):**  
+   Factorize the user-user follow matrix: $$F = CP^T$$ where:
+   - $$d$$ is the embedding dimension.
+   - $$C \in \mathbb{R}^{\lvert C \rvert \times d}$$ (consumers)  
+   - $$P \in \mathbb{R}^{\lvert P \rvert \times d}$$ (producers)
+   Given that follows are infrequent and high-signal (e.g., users with >= 30 followers), this batch computation is efficient.
+
+2. **Real-Time Incremental Updates (Post Embeddings):**  
+   Initialize each post embedding with its producer vector. When a user $$ k $$ interacts with post $$ j $$, update:
+   $$
+   V_j \leftarrow \frac{V_j + C_{k}}{||V_j + C_{k}||_2}
+   $$
+   This mechanism, similar to message passing in Graph Neural Networks, integrates user interactions immediately into the post representation.
 
 <div style="width: 100%; display: flex; justify-content: center;">
     <object type="image/svg+xml" data="assets/pipeline1.svg" style="width: 100%; max-height: 500px;"></object>
 </div>
 
+This framework leverages high-signal user connections for efficient real-time recommendations, feeding both candidate generation and our GraphRec model.
+
 <iframe src="assets/producer_embeddings.html" width="800" height="600" frameBorder="0"></iframe>
 
-TODO Need to explain what this plot is representing
+*The diagram and interactive plot illustrate the embedding pipeline and the evolution of producer embeddings over time.*
 
 ---
 
