@@ -98,7 +98,7 @@ This framework leverages high-signal user connections for efficient real-time re
 
 <iframe src="assets/producer_embeddings.html" width="800" height="600" frameBorder="0"></iframe>
 
-*An interactive plot demonstrating the initial producer embeddings.*
+*An interactive plot demonstrating the working producer embeddings (zoom in to see names)*
 
 ---
 
