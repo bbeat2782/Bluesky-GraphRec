@@ -16,11 +16,6 @@ title: Evaluating Graph Transformers for Scalable Social Media Recommendations
 
 Recommendation systems in social media platforms face unique challenges compared to traditional recommendation domains like movies or music. Unlike static user-item interactions, social media engagement is highly dynamic—users interact with new posts, trends emerge, and user preferences shift rapidly. Traditional recommendation techniques, such as collaborative filtering and matrix factorization, require periodic recomputation over the entire dataset, making them computationally expensive and difficult to scale for real-time recommendations.
 
-Additionally, decentralized platforms like Bluesky introduce further complexities:
-- **Lack of centralized control**: Unlike traditional social media platforms, where a single entity maintains and processes all user data, Bluesky operates on an open and federated network.
-- **Scalability constraints**: Real-time recommendation updates must efficiently handle large, evolving graphs without centralized computation.
-- **User privacy concerns**: Decentralized social networks require recommendation models that can function without relying on a single authority managing user data.
-
 Given these challenges, a scalable and decentralized recommendation system must adapt in real-time while maintaining computational efficiency.
 
 
@@ -103,7 +98,7 @@ This framework leverages high-signal user connections for efficient real-time re
 
 <iframe src="assets/producer_embeddings.html" width="800" height="600" frameBorder="0"></iframe>
 
-*The diagram and interactive plot illustrate the embedding pipeline and the evolution of producer embeddings over time.*
+*An interactive plot demonstrating the initial producer embeddings.*
 
 ---
 
