@@ -4,7 +4,7 @@ This repository is built for the project **Bluesky: Post Recommendation**, prima
 
 ## Overview
 
-Bluesky-GraphRec is a dynamic post recommendation system for Bluesky, leveraging DyGFormer to model evolving user-post interactions over time. Unlike static methods, our approach incorporates graph-based recommendations with temporal learning, ensuring personalized and adaptive suggestions. We implement efficient candidate generation and evaluate performance using dynamic link prediction tasks. The system is benchmarked against models like TGAT, analyzing whether recommendations favor popular content or promote diverse engagement.
+Bluesky-GraphRec is a dynamic post recommendation system for Bluesky, leveraging DyGFormer to model evolving user-post interactions over time. Unlike static methods, our approach incorporates graph-based recommendations with temporal learning, ensuring personalized and adaptive suggestions. We implement efficient candidate generation and evaluate performance using dynamic link prediction tasks. The system is benchmarked against models like Popularity based and MLP based, analyzing whether recommendations favor popular content or promote diverse engagement.
 
 ## Environments
 Follow these steps to set up the `bluesky` environment:
@@ -56,12 +56,13 @@ python precompute_post_embeddings.py
 python train_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 5 --num_runs 3 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_heads 2 --walk_length 2 --num_neighbors 10 --seed 100
 ```
 
+* Training *TGAT* replaced with MLP on *Bluesky* dataset:
 ```{bash}
 python train_link_prediction.py --dataset_name bluesky --model_name TGAT --num_runs 3 --gpu 0 --batch_size 512 --negative_sample_strategy historical --num_epochs 50 --num_neighbors 10 --num_layers 2 --seed 42
 ```
 
 #### Model Evaluation
-* Evaluating *GraphRec* with posts that received at least one like in the last 20 minutes as candidate generation on *Bluesky* dataset:
+* Evaluating *GraphRec* on *Bluesky* dataset:
 
 ```{bash}
 python evaluate_link_prediction.py --dataset_name bluesky --model_name GraphRecMultiCo --patch_size 5 --num_runs 3 --gpu 0 --batch_size 4 --negative_sample_strategy real --num_heads 2 --walk_length 2 --num_neighbors 10 --seed 100 --time_window_hours 24 --n_candidates 2000
