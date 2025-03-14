@@ -1,6 +1,6 @@
 # Bluesky-GraphRec
 
-This repository is built for the project **Bluesky: Post Recommendation**, primarily leveraging **DyGFormer** as the backbone model. We acknowledge the authors of DyGFormer for their foundational contributions, as detailed in [Towards Better Dynamic Graph Learning: New Architecture and Unified Library](https://arxiv.org/abs/2303.13047).
+This repository is built for the project **Bluesky: Post Recommendation**, primarily leveraging **DyGFormer** as the backbone model.
 
 ## Overview
 
@@ -75,7 +75,6 @@ python evaluate_link_prediction.py --dataset_name bluesky --model_name TGAT --nu
 
 ## Acknowledgments
 
-We are grateful to the authors of 
 [TGAT](https://github.com/StatsDLMathsRecomSys/Inductive-representation-learning-on-temporal-graphs), 
 [TGN](https://github.com/twitter-research/tgn), 
 [CAWN](https://github.com/snap-stanford/CAW), 
